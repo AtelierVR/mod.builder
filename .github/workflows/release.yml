@@ -29,6 +29,9 @@ jobs:
           MANIFEST="nox.mod.json"
           [ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
           echo "mod_id=$(jq -r '.id' "$MANIFEST")" >> $GITHUB_OUTPUT
+          VERSION=$(jq -r '.version' "$MANIFEST")
+          VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - uses: actions/download-artifact@v4
         with:
@@ -41,4 +44,4 @@ jobs:
           prerelease: ${{ inputs.prerelease == 'true' }}
           make_latest: ${{ github.ref == 'refs/heads/main' }}
           generate_release_notes: true
-          files: ${{ steps.meta.outputs.mod_id }}.noxmod
+          files: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip

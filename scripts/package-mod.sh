@@ -1,8 +1,8 @@
 #!/bin/bash
 # ────────────────────────────────────────────────────────────────
-# package-mod.sh — zip the built mod into .noxmod
+# package-mod.sh — zip the built mod into <id>-<version>.zip
 #
-# Inputs: MOD_ID, BUILD_DIR (path to Packages/<id>/build/<id>/)
+# Inputs: MOD_ID, BUILD_DIR (path to build/<id>/)
 # ────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -13,6 +13,16 @@ OUTPUT_DIR="${GITHUB_WORKSPACE:-.}"
 
 cd "${GITHUB_WORKSPACE:-.}"
 cd "$BUILD_DIR"
-zip -r "$OUTPUT_DIR/$MOD_ID.noxmod" .
-echo "Packaged: $OUTPUT_DIR/$MOD_ID.noxmod"
-ls -lh "$OUTPUT_DIR/$MOD_ID.noxmod"
+
+# Read version from nox.mod.json (fallback to nox.mod.jsonc)
+MANIFEST="nox.mod.json"
+[ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
+VERSION=$(jq -r '.version' "$MANIFEST")
+# Sanitize version for filename
+VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
+
+ARCHIVE="$MOD_ID-$VERSION.zip"
+zip -r "$OUTPUT_DIR/$ARCHIVE" .
+echo "Packaged: $OUTPUT_DIR/$ARCHIVE"
+echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+ls -lh "$OUTPUT_DIR/$ARCHIVE"
