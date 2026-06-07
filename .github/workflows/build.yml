@@ -143,9 +143,7 @@ jobs:
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
         shell: bash
-        run: bash .mod-builder/scripts/package-mod.sh \
-          "$MOD_ID" \
-          "${{ github.workspace }}/project/build/$MOD_ID"
+        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID"
 
       - uses: actions/upload-artifact@v4
         with:
