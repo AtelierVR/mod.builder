@@ -49,7 +49,7 @@ Sep "UNITY_EMAIL"
 if (Test-SecretExists "UNITY_EMAIL") {
   Info "Already set."
 } else {
-  $email = Read-Host "  Unity account email"
+  $email = if ($env:UNITY_EMAIL) { $env:UNITY_EMAIL } else { Read-Host "  Unity account email" }
   gh secret set UNITY_EMAIL --body "$email"
   Ok "Set."
 }
@@ -58,7 +58,7 @@ Sep "UNITY_PASSWORD"
 if (Test-SecretExists "UNITY_PASSWORD") {
   Info "Already set."
 } else {
-  $pw = Read-Host "  Unity account password" -AsSecureString
+  $pw = if ($env:UNITY_PASSWORD) { ConvertTo-SecureString $env:UNITY_PASSWORD -AsPlainText -Force } else { Read-Host "  Unity account password" -AsSecureString }
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw)
   gh secret set UNITY_PASSWORD --body ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr))
   Ok "Set."
