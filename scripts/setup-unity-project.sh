@@ -41,11 +41,7 @@ DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id
 for dep in $DEPS; do
   URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
   if [ -z "$URL" ]; then
-    URL="git+https://github.com/AtelierVR/${dep}.git"
-    echo "  $dep → $URL (guessed, no register in manifest)"
-  fi
-  if [ -z "$URL" ]; then
-    echo "::error::Cannot resolve dependency '$dep': no register found and no guess possible"
+    echo "::error::Missing register for dependency '$dep' in $MOD_DIR/nox.mod.jsonc"
     exit 1
   fi
 
@@ -78,9 +74,16 @@ done
 BUILDER_DEPS="nox.loader nox.game.builder"
 BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git"}'
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
+RESOLVED_IDS=""
 while [ -n "$RESOLVED_DEPS" ]; do
   NEW_DEPS=""
   for dep in $RESOLVED_DEPS; do
+    # Skip already-resolved deps (dedup: multiple manifests in same repo)
+    case " $RESOLVED_IDS " in
+      *" $dep "*) continue ;;
+    esac
+    RESOLVED_IDS="$RESOLVED_IDS $dep"
+
     # Only recurse into git dependencies (not upm/nuget)
     URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
@@ -112,8 +115,8 @@ while [ -n "$RESOLVED_DEPS" ]; do
               # Fallback: old-style top-level "registers" object
               [ -z "$SD_URL" ] && SD_URL=$(jq -r --arg d "$sd" '.registers[$d] // empty' "$manifest" 2>/dev/null)
               if [ -z "$SD_URL" ]; then
-                echo "::warning::Transitive dependency '$sd' of '$dep' has no register — skipping (may cause compilation errors)"
-                continue
+                echo "::error::Missing register for transitive dependency '$sd' of '$dep' in $manifest"
+                exit 1
               fi
               # Already in manifest?
               if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
