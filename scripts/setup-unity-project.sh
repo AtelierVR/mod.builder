@@ -167,6 +167,34 @@ while [ -n "$RESOLVED_DEPS" ]; do
   RESOLVED_DEPS="$NEW_DEPS"
 done
 
+# ── Final pass: normalize keys to match each package's own id ──
+echo ""
+echo "=== Normalizing manifest keys ==="
+for key in $(jq -r '.dependencies | keys[]' "$PROJECT_DIR/Packages/manifest.json"); do
+  URL=$(jq -r --arg k "$key" '.dependencies[$k]' "$PROJECT_DIR/Packages/manifest.json")
+  case "$URL" in
+    http*)
+      CLONE_URL="${URL%%\?*}"
+      TMPDIR=$(mktemp -d)
+      if git clone --depth 1 "$CLONE_URL" "$TMPDIR" 2>/dev/null; then
+        for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
+          if [ -f "$mf" ]; then
+            REAL_ID=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
+            if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ] && [ "$REAL_ID" != "$key" ]; then
+              echo "  $key → $REAL_ID"
+              jq --arg old "$key" --arg new "$REAL_ID" --arg u "$URL" \
+                'del(.dependencies[$old]) | .dependencies[$new] = $u' \
+                "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+            fi
+            break
+          fi
+        done
+        rm -rf "$TMPDIR"
+      fi
+      ;;
+  esac
+done
+
 echo ""
 echo "=== Final manifest ==="
 jq '.dependencies' "$PROJECT_DIR/Packages/manifest.json"
