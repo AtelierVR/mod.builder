@@ -54,31 +54,33 @@ for dep in $DEPS; do
   URL="${URL#git+}"
   URL="${URL#upm:}"
   URL="${URL#nuget:}"
+  echo "  $dep → $URL (resolving key...)"
 
-  # Derive package id from URL for git deps (ignore short name in relation)
+  # Resolve real package id: clone + read nox.mod.json or package.json
+  PKG_ID="$dep"
   case "$URL" in
     http*)
-      # Extract repo name from git URL: .../AtelierVR/nox.search.git → nox.search
-      PKG_ID=$(echo "$URL" | sed 's|.*/||; s|\.git$||')
-      ;;
-    *)
-      PKG_ID="$dep"  # UPM/nuget: dep id is the package id
-      ;;
-  esac
-  echo "  $dep → $URL (→ $PKG_ID)"
-
-  # Verify git repos exist before adding to manifest
-  case "$URL" in
-    http*)
-      # Strip UPM query params (?path=...) for git ls-remote
       VERIFY_URL="${URL%%\?*}"
+      TMPDIR=$(mktemp -d)
+      if git clone --depth 1 "$VERIFY_URL" "$TMPDIR" 2>/dev/null; then
+        for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
+          if [ -f "$mf" ]; then
+            REAL_ID=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
+            if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ]; then
+              PKG_ID="$REAL_ID"
+              break
+            fi
+          fi
+        done
+        rm -rf "$TMPDIR"
+      fi
       if ! git ls-remote --heads "$VERIFY_URL" &>/dev/null; then
         echo "::error::Git repository unreachable for '$dep': $VERIFY_URL"
-        echo "::error::Check the register URL in $MANIFEST"
         exit 1
       fi
       ;;
   esac
+  echo "  → key=$PKG_ID url=$URL"
 
   jq --arg d "$PKG_ID" --arg u "$URL" '.dependencies[$d] = $u' \
     "$PROJECT_DIR/Packages/manifest.json" > tmp.json \
