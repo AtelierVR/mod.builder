@@ -127,6 +127,18 @@ jobs:
           name: ${{ steps.meta.outputs.mod_id }}-manifest
           path: project/Packages/manifest.json
 
+      - name: Debug output path
+        if: always()
+        shell: bash
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "=== ls project/ ==="
+          ls -la project/ || echo "project/ not found"
+          echo "=== ls project/build/ ==="
+          ls -la project/build/ || echo "project/build/ not found"
+          echo "=== find project/build ==="
+          find project/build -type f 2>/dev/null || echo "no build files"
+
       - name: Package
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
