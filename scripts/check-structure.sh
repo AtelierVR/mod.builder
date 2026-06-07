@@ -66,7 +66,7 @@ else
   else
     echo "$ENTRYPOINTS" | while read -r ep; do
       # Extract assembly name: "Nox.Network.Runtime.Main" → "Nox.Network.Runtime"
-      ASM="${ep%%.*}"
+      ASM="${ep%.*}"
       if echo "$ALL_ASMDEFS" | grep -qFx "$ASM"; then
         echo "  [OK]   $ep → $ASM"
       else
