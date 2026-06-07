@@ -11,6 +11,13 @@ on:
         type: string
         default: ""
         description: "Version to pass to Unity BuildMod"
+    secrets:
+      UNITY_LICENSE:
+        required: true
+      UNITY_EMAIL:
+        required: true
+      UNITY_PASSWORD:
+        required: true
 
 jobs:
   build:
