@@ -1,24 +1,15 @@
 #!/bin/bash
-# ────────────────────────────────────────────────────────────────
 # compute-version.sh — semver from nox.mod.jsonc + branch
-#
-# Version field: "1.0.x" → auto-increment patch from git tags
-#                 "1.0.0" → fixed, no increment
-#
-# Tag:  main        → v1.0.5
-#       development → v1.0.5-dev
-#       feature/x   → v1.0.5-feature-x
-#
-# VERSION_OVERRIDE env var skips auto-increment.
-#
-# Outputs: resolved, tag, prerelease
-# ────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 BRANCH="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
-RAW=$(jq -r '.version' nox.mod.jsonc)
+MANIFEST="nox.mod.jsonc"
+[ -f "$MANIFEST" ] || MANIFEST="nox.mod.json"
+[ -f "$MANIFEST" ] || { echo "FAIL: nox.mod.json[c] not found"; exit 1; }
 
-# Sanitize branch name for tag suffix
+RAW=$(jq -r '.version' "$MANIFEST")
+echo "version: $RAW  branch: $BRANCH"
+
 suffix() { echo "$1" | sed 's/[^a-zA-Z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//'; }
 
 if [ -n "${VERSION_OVERRIDE:-}" ]; then
@@ -28,7 +19,6 @@ else
     MAJOR_MINOR="${RAW%%.x}"
     PREFIX="v${MAJOR_MINOR}."
 
-    # main counts only stable tags; others count all
     if [ "$BRANCH" = "main" ]; then
       LAST=$(git tag -l "${PREFIX}*" | grep -v '\-' | sort -V | tail -1)
     else
@@ -57,4 +47,4 @@ fi
 echo "resolved=$RESOLVED" >> "$GITHUB_OUTPUT"
 echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-echo "→ $TAG (resolved: $RESOLVED, prerelease: $PRERELEASE)"
+echo ">> $TAG (resolved: $RESOLVED, prerelease: $PRERELEASE)"
