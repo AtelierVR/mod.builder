@@ -54,7 +54,18 @@ for dep in $DEPS; do
   URL="${URL#git+}"
   URL="${URL#upm:}"
   URL="${URL#nuget:}"
-  echo "  $dep → $URL"
+
+  # Derive package id from URL for git deps (ignore short name in relation)
+  case "$URL" in
+    http*)
+      # Extract repo name from git URL: .../AtelierVR/nox.search.git → nox.search
+      PKG_ID=$(echo "$URL" | sed 's|.*/||; s|\.git$||')
+      ;;
+    *)
+      PKG_ID="$dep"  # UPM/nuget: dep id is the package id
+      ;;
+  esac
+  echo "  $dep → $URL (→ $PKG_ID)"
 
   # Verify git repos exist before adding to manifest
   case "$URL" in
@@ -69,7 +80,7 @@ for dep in $DEPS; do
       ;;
   esac
 
-  jq --arg d "$dep" --arg u "$URL" '.dependencies[$d] = $u' \
+  jq --arg d "$PKG_ID" --arg u "$URL" '.dependencies[$d] = $u' \
     "$PROJECT_DIR/Packages/manifest.json" > tmp.json \
     && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
 done
@@ -112,8 +123,19 @@ while [ -n "$RESOLVED_DEPS" ]; do
         for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
           [ -f "$manifest" ] || continue
           TYPE=$(jq -r '.type // "mod"' "$manifest")
+          PKG_ID=$(jq -r '.id // empty' "$manifest")
           if [ "$TYPE" = "library" ] || [ "$TYPE" = "mod" ]; then
-            echo "  → resolving library: $dep"
+            # Use the package's own id, not the relation's short name
+            echo "  → resolving library: $PKG_ID"
+            # If manifest key differs from dep name, fix it
+            if [ "$dep" != "$PKG_ID" ] && [ -n "$PKG_ID" ]; then
+              OLD_URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
+              if [ -n "$OLD_URL" ]; then
+                jq --arg d "$dep" 'del(.dependencies[$d])' "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+                jq --arg d "$PKG_ID" --arg u "$OLD_URL" '.dependencies[$d] = $u' "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+                echo "    (renamed $dep → $PKG_ID)"
+              fi
+            fi
             SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
             for sd in $SUB_DEPS; do
               SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
