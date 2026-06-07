@@ -63,13 +63,23 @@ RESOLVED_IDS=""  # space-separated: id + all provides
 
 # Helper: fetch manifest via git clone --depth 1 (single strategy, all hosts)
 fetch_manifest() {
-  local repo="$1" mf id provides relations
+  local repo="$1" mf id provides relations subpath
   repo="${repo#git+}"
+
+  # Extract subpath from ?path=... (UPM git URLs)
+  subpath=""
+  case "$repo" in
+    *\?path=*)
+      subpath="/${repo#*\?path=}"
+      subpath="${subpath%%\?*}"
+      ;;
+  esac
   repo="${repo%%\?*}"
+  repo="${repo%%.git}"
 
   local TMPDIR=$(mktemp -d)
   if git clone --depth 1 "$repo" "$TMPDIR" 2>/dev/null; then
-    for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
+    for mf in "$TMPDIR$subpath/nox.mod.json" "$TMPDIR$subpath/nox.mod.jsonc" "$TMPDIR$subpath/package.json" "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
       if [ -f "$mf" ]; then
         id=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
         if [ -n "$id" ] && [ "$id" != "null" ]; then
