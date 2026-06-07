@@ -91,10 +91,12 @@ while [ -n "$RESOLVED_DEPS" ]; do
     case "$URL" in
       git+*|http*)
         REPO_URL="${URL#git+}"
+        # Strip UPM query params (?path=...) — git doesn't understand them
+        CLONE_URL="${REPO_URL%%\?*}"
         # Use a unique temp dir
         TMPDIR=$(mktemp -d)
-        if ! git clone --depth 1 "$REPO_URL" "$TMPDIR" 2>/dev/null; then
-          echo "::error::Failed to clone '$dep' from $REPO_URL"
+        if ! git clone --depth 1 "$CLONE_URL" "$TMPDIR" 2>/dev/null; then
+          echo "::error::Failed to clone '$dep' from $CLONE_URL"
           echo "::error::Check that the repository exists and is accessible"
           rm -rf "$TMPDIR"
           exit 1
