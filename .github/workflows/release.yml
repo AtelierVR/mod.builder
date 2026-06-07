@@ -25,7 +25,10 @@ jobs:
       - name: Read mod id
         id: meta
         shell: bash
-        run: echo "mod_id=$(jq -r '.id' nox.mod.jsonc)" >> $GITHUB_OUTPUT
+        run: |
+          MANIFEST="nox.mod.json"
+          [ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
+          echo "mod_id=$(jq -r '.id' "$MANIFEST")" >> $GITHUB_OUTPUT
 
       - uses: actions/download-artifact@v4
         with:
