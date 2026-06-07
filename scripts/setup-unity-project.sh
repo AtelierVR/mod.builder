@@ -57,12 +57,16 @@ for dep in $DEPS; do
 done
 
 # ── 3b. Recursive: resolve transitive deps from library manifests ──
-RESOLVED_DEPS="$DEPS"
+# Include hardcoded builder deps in recursive resolution
+BUILDER_DEPS="nox.loader nox.game.builder"
+BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git"}'
+RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
 while [ -n "$RESOLVED_DEPS" ]; do
   NEW_DEPS=""
   for dep in $RESOLVED_DEPS; do
     # Only recurse into git dependencies (not upm/nuget)
     URL=$(jq -r --arg d "$dep" '.registers[$d] // empty' "$MOD_DIR/nox.mod.jsonc")
+    [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
     [ -z "$URL" ] && continue
     case "$URL" in
       git+*|http*)
