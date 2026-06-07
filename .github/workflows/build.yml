@@ -10,15 +10,13 @@ on:
       version:
         type: string
         default: ""
-      unity_license:
-        type: string
-        default: ""
-      unity_email:
-        type: string
-        default: ""
-      unity_password:
-        type: string
-        default: ""
+    secrets:
+      UNITY_LICENSE:
+        required: true
+      UNITY_EMAIL:
+        required: true
+      UNITY_PASSWORD:
+        required: true
 
 jobs:
   build:
@@ -63,14 +61,16 @@ jobs:
         run: |
           cd project
           git init
+          git config user.email "ci@mod.builder"
+          git config user.name "mod.builder"
           git add -A
           git commit -m "init" --no-verify || true
 
       - uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ inputs.unity_license }}
-          UNITY_EMAIL: ${{ inputs.unity_email }}
-          UNITY_PASSWORD: ${{ inputs.unity_password }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: project
           unityVersion: 6000.4.4f1
