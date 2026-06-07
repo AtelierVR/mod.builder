@@ -20,7 +20,7 @@ else
     PREFIX="v${MAJOR_MINOR}."
 
     if [ "$BRANCH" = "main" ]; then
-      LAST=$(git tag -l "${PREFIX}*" | grep -v '\-' | sort -V | tail -1)
+      LAST=$(git tag -l "${PREFIX}*" | { grep -v '\-' || true; } | sort -V | tail -1)
     else
       LAST=$(git tag -l "${PREFIX}*" | sort -V | tail -1)
     fi
