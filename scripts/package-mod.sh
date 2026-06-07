@@ -24,5 +24,5 @@ VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
 ARCHIVE="$MOD_ID-$VERSION.zip"
 zip -r "$OUTPUT_DIR/$ARCHIVE" .
 echo "Packaged: $OUTPUT_DIR/$ARCHIVE"
-echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+echo "$ARCHIVE"
 ls -lh "$OUTPUT_DIR/$ARCHIVE"

@@ -132,7 +132,9 @@ jobs:
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
         shell: bash
-        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID"
+        run: |
+          ARCHIVE=$(bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" | tail -1)
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
