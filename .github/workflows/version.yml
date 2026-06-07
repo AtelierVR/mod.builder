@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
-# Reusable — compute version + bump nox.mod.jsonc + commit
+# Reusable — compute next semver, no side effects
 # ═══════════════════════════════════════════════════════════════
 
 name: Version
@@ -21,8 +21,6 @@ on:
 jobs:
   version:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       resolved: ${{ steps.semver.outputs.resolved }}
       tag: ${{ steps.semver.outputs.tag }}
@@ -31,7 +29,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN || github.token }}
 
       - uses: actions/checkout@v4
         with:
@@ -46,14 +43,3 @@ jobs:
           VERSION_OVERRIDE: ${{ inputs.override }}
         shell: bash
         run: bash .mod-builder/scripts/compute-version.sh
-
-      - name: Bump & commit
-        shell: bash
-        run: |
-          jq --arg v "${{ steps.semver.outputs.resolved }}" '.version = $v' \
-            nox.mod.jsonc > tmp.json && mv tmp.json nox.mod.jsonc
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add nox.mod.jsonc
-          git commit -m "chore: bump to ${{ steps.semver.outputs.resolved }} [skip ci]" || echo "No changes"
-          git push origin HEAD:${{ github.ref_name }}

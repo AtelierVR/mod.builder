@@ -50,6 +50,15 @@ jobs:
         shell: bash
         run: bash .mod-builder/scripts/setup-unity-project.sh
 
+      - name: Set version
+        shell: bash
+        run: |
+          MOD_ID="${{ steps.meta.outputs.mod_id }}"
+          V="${{ steps.meta.outputs.version }}"
+          MANIFEST="project/Packages/$MOD_ID/nox.mod.jsonc"
+          echo "Setting version: $MOD_ID → $V"
+          jq --arg v "$V" '.version = $v' "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
+
       - uses: actions/cache@v4
         with:
           path: project/Library
