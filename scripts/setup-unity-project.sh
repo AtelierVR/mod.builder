@@ -61,47 +61,27 @@ BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.gi
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
 RESOLVED_IDS=""  # space-separated: id + all provides
 
-# Helper: fetch manifest from raw.githubusercontent.com, try main then master,
-# fallback to git ls-remote --symref for non-GitHub repos
+# Helper: fetch manifest via git clone --depth 1 (single strategy, all hosts)
 fetch_manifest() {
-  local repo="$1" mf id provides relations branch raw content branches
+  local repo="$1" mf id provides relations
   repo="${repo#git+}"
-  repo="${repo%%.git}"
   repo="${repo%%\?*}"
-  local repo_path="${repo#https://github.com/}"
 
-  # Try main/master for GitHub repos
-  if [ "$repo_path" != "$repo" ]; then
-    # It's a GitHub URL
-    for branch in main master; do
-      for mf in nox.mod.json nox.mod.jsonc package.json; do
-        raw="https://raw.githubusercontent.com/$repo_path/refs/heads/$branch/$mf"
-        content=$(curl -sL "$raw" 2>/dev/null)
-        if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
-          id=$(echo "$content" | jq -r '.id // .name // empty')
-          provides=$(echo "$content" | jq -r '[.provides[]?] | join(" ")' 2>/dev/null)
-          relations=$(echo "$content" | jq -c '[.relations[]? | {id,type,register}]' 2>/dev/null)
+  local TMPDIR=$(mktemp -d)
+  if git clone --depth 1 "$repo" "$TMPDIR" 2>/dev/null; then
+    for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
+      if [ -f "$mf" ]; then
+        id=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
+        if [ -n "$id" ] && [ "$id" != "null" ]; then
+          provides=$(jq -r '[.provides[]?] | join(" ")' "$mf" 2>/dev/null)
+          relations=$(jq -c '[.relations[]? | {id,type,register}]' "$mf" 2>/dev/null)
           echo "$id|$provides|$relations"
+          rm -rf "$TMPDIR"
           return 0
         fi
-      done
-    done
-  fi
-
-  # Non-GitHub or both branches failed: detect default branch via git ls-remote
-  local head_ref=$(git ls-remote --symref "$repo" HEAD 2>/dev/null | head -1 | sed 's|ref: refs/heads/||; s|[\t ]*HEAD||')
-  if [ -n "$head_ref" ] && [ "$repo_path" != "$repo" ]; then
-    for mf in nox.mod.json nox.mod.jsonc package.json; do
-      raw="https://raw.githubusercontent.com/$repo_path/refs/heads/$head_ref/$mf"
-      content=$(curl -sL "$raw" 2>/dev/null)
-      if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
-        id=$(echo "$content" | jq -r '.id // .name // empty')
-        provides=$(echo "$content" | jq -r '[.provides[]?] | join(" ")' 2>/dev/null)
-        relations=$(echo "$content" | jq -c '[.relations[]? | {id,type,register}]' 2>/dev/null)
-        echo "$id|$provides|$relations"
-        return 0
       fi
     done
+    rm -rf "$TMPDIR"
   fi
 
   return 1
@@ -188,6 +168,11 @@ done
 echo ""
 echo "=== Final manifest ==="
 jq '.dependencies' "$PROJECT_DIR/Packages/manifest.json"
+
+# ── Annotate: list all deps with registers ──
+DEPS_COUNT=$(jq '.dependencies | length' "$PROJECT_DIR/Packages/manifest.json")
+echo "::notice title=Dependencies::$DEPS_COUNT dependencies resolved"
+jq -r '.dependencies | to_entries[] | "::group::\(.key)\n  register: \(.value)\n::endgroup::"' "$PROJECT_DIR/Packages/manifest.json"
 
 # ── 4. Place mod in Packages/ ──────────────────────────────────
 mkdir -p "$PROJECT_DIR/Packages/$MOD_ID"
