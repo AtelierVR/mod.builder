@@ -81,7 +81,9 @@ fi
 echo ""
 if [ "$ERRORS" -eq 0 ]; then
   echo "All checks passed!"
+  echo "::notice title=Check::All structure checks passed"
 else
   echo "$ERRORS error(s) found"
+  echo "::error title=Check::$ERRORS structure check(s) failed"
   exit 1
 fi

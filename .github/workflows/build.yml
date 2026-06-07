@@ -66,6 +66,15 @@ jobs:
           git add -A
           git commit -m "init" --no-verify || true
 
+      - name: Pre-build
+        shell: bash
+        run: |
+          echo "::group::Pre-build"
+          echo "Mod     : ${{ steps.meta.outputs.mod_id }}"
+          echo "Version : ${{ steps.meta.outputs.version }}"
+          echo "::notice title=Pre-build::${{ steps.meta.outputs.mod_id }} v${{ steps.meta.outputs.version }}"
+          echo "::endgroup::"
+
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -81,6 +90,23 @@ jobs:
           customParameters: >-
             -noxModToBuild ${{ steps.meta.outputs.mod_id }}
             -noxOutputPath Packages/${{ steps.meta.outputs.mod_id }}/build/${{ steps.meta.outputs.mod_id }}
+
+      - name: Post-build
+        if: always()
+        shell: bash
+        run: |
+          echo "::group::Post-build"
+          MOD_ID="${{ steps.meta.outputs.mod_id }}"
+          OUTPUT="project/Packages/$MOD_ID/build/$MOD_ID"
+          if [ -d "$OUTPUT" ]; then
+            DLLS=$(find "$OUTPUT" -name "*.dll" | wc -l)
+            BUNDLES=$(find "$OUTPUT" -name "*.assets" -o -name "*.scenes" -o -name "*.scriptables" | wc -l)
+            echo "DLLs: $DLLS  AssetBundles: $BUNDLES"
+            echo "::notice title=Post-build::$MOD_ID built ($DLLS DLLs, $BUNDLES bundles)"
+          else
+            echo "::warning title=Post-build::Build failed, no output found"
+          fi
+          echo "::endgroup::"
 
       - name: Package
         env:
