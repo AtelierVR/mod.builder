@@ -39,7 +39,7 @@ cat > "$PROJECT_DIR/Packages/manifest.json" << 'MANIFEST'
 }
 MANIFEST
 
-# ── 3. Resolve dependencies from registers ─────────────────────
+# ── 3. Resolve dependencies (fetch manifests via curl, no full clone) ──
 DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id] | .[]' \
   "$MANIFEST" 2>/dev/null || echo "")
 
@@ -49,147 +49,118 @@ for dep in $DEPS; do
     echo "::error::Missing register for dependency '$dep' in $MANIFEST"
     exit 1
   fi
-
-  # Strip scheme prefix
-  URL="${URL#git+}"
-  URL="${URL#upm:}"
-  URL="${URL#nuget:}"
-  echo "  $dep → $URL (resolving key...)"
-
-  # Resolve real package id: clone + read nox.mod.json or package.json
-  PKG_ID="$dep"
-  case "$URL" in
-    http*)
-      VERIFY_URL="${URL%%\?*}"
-      TMPDIR=$(mktemp -d)
-      if git clone --depth 1 "$VERIFY_URL" "$TMPDIR" 2>/dev/null; then
-        for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
-          if [ -f "$mf" ]; then
-            REAL_ID=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
-            if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ]; then
-              PKG_ID="$REAL_ID"
-              break
-            fi
-          fi
-        done
-        rm -rf "$TMPDIR"
-      fi
-      if ! git ls-remote --heads "$VERIFY_URL" &>/dev/null; then
-        echo "::error::Git repository unreachable for '$dep': $VERIFY_URL"
-        exit 1
-      fi
-      ;;
-  esac
-  echo "  → key=$PKG_ID url=$URL"
-
-  jq --arg d "$PKG_ID" --arg u "$URL" '.dependencies[$d] = $u' \
-    "$PROJECT_DIR/Packages/manifest.json" > tmp.json \
-    && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+  URL="${URL#git+}"; URL="${URL#upm:}"; URL="${URL#nuget:}"
+  echo "  $dep → $URL"
+  jq --arg d "$dep" --arg u "$URL" '.dependencies[$d] = $u' \
+    "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
 done
 
-# ── 3b. Recursive: resolve transitive deps from library manifests ──
-# Include hardcoded builder deps in recursive resolution
+# ── 3b. Recursive: fetch manifests via curl, dedup by id+provides ──
 BUILDER_DEPS="nox.loader nox.game.builder"
 BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git"}'
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
-RESOLVED_IDS=""
+RESOLVED_IDS=""  # space-separated: id + all provides
+
+# Helper: convert git URL to raw.githubusercontent.com path
+raw_url() {
+  local u="$1" file="$2"
+  u="${u#git+}"
+  u="${u%%.git}"
+  u="${u%%\?*}"                    # strip ?path=...
+  u="${u#https://github.com/}"     # → AtelierVR/repo
+  echo "https://raw.githubusercontent.com/$u/main/$file"
+}
+
+# Helper: fetch manifest, output id + provides + relations as JSON
+fetch_manifest() {
+  local base="$1" mf id provides relations
+  for mf in nox.mod.json nox.mod.jsonc package.json; do
+    local raw=$(raw_url "$base" "$mf")
+    local content=$(curl -sL "$raw" 2>/dev/null)
+    if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
+      id=$(echo "$content" | jq -r '.id // .name // empty')
+      provides=$(echo "$content" | jq -r '[.provides[]?] | join(" ")' 2>/dev/null)
+      relations=$(echo "$content" | jq -c '[.relations[]? | {id,type,register}]' 2>/dev/null)
+      echo "$id|$provides|$relations"
+      return 0
+    fi
+  done
+  return 1
+}
+
 while [ -n "$RESOLVED_DEPS" ]; do
   NEW_DEPS=""
   for dep in $RESOLVED_DEPS; do
-    # Skip already-resolved deps (dedup: multiple manifests in same repo)
+    # Dedup: skip if dep or any of its known provides already resolved
     case " $RESOLVED_IDS " in
       *" $dep "*) continue ;;
     esac
-    RESOLVED_IDS="$RESOLVED_IDS $dep"
 
-    # Only recurse into git dependencies (not upm/nuget)
+    # Get URL for this dep (from mod manifest, builder registers, or manifest.json)
     URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MANIFEST")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
     [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
-    if [ -z "$URL" ]; then
-      continue  # not a Nox library, no register to recurse into
-    fi
+    [ -z "$URL" ] && continue  # upm/nuget, can't recurse
+
     case "$URL" in
       git+*|http*)
-        REPO_URL="${URL#git+}"
-        # Strip UPM query params (?path=...) — git doesn't understand them
-        CLONE_URL="${REPO_URL%%\?*}"
-        # Use a unique temp dir
-        TMPDIR=$(mktemp -d)
-        if ! git clone --depth 1 "$CLONE_URL" "$TMPDIR" 2>/dev/null; then
-          echo "::error::Failed to clone '$dep' from $CLONE_URL"
-          echo "::error::Check that the repository exists and is accessible"
-          rm -rf "$TMPDIR"
+        MANIFEST_DATA=$(fetch_manifest "$URL")
+        if [ -z "$MANIFEST_DATA" ]; then
+          echo "::error::Failed to fetch manifest for '$dep' from $URL"
           exit 1
         fi
-        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
-          [ -f "$manifest" ] || continue
-          TYPE=$(jq -r '.type // "mod"' "$manifest")
-          PKG_ID=$(jq -r '.id // empty' "$manifest")
-          if [ "$TYPE" = "library" ] || [ "$TYPE" = "mod" ]; then
-            # Use the package's own id, not the relation's short name
-            echo "  → resolving library: $PKG_ID"
-            # If manifest key differs from dep name, fix it
-            if [ "$dep" != "$PKG_ID" ] && [ -n "$PKG_ID" ]; then
-              OLD_URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
-              if [ -n "$OLD_URL" ]; then
-                jq --arg d "$dep" 'del(.dependencies[$d])' "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
-                jq --arg d "$PKG_ID" --arg u "$OLD_URL" '.dependencies[$d] = $u' "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
-                echo "    (renamed $dep → $PKG_ID)"
-              fi
+
+        MID=$(echo "$MANIFEST_DATA" | cut -d'|' -f1)
+        MPROV=$(echo "$MANIFEST_DATA" | cut -d'|' -f2)
+        MRELS=$(echo "$MANIFEST_DATA" | cut -d'|' -f3)
+
+        echo "  → resolving: $MID"
+        # Mark id + all provides as resolved
+        RESOLVED_IDS="$RESOLVED_IDS $MID $MPROV"
+
+        # Process sub-deps
+        if [ "$MRELS" != "null" ] && [ -n "$MRELS" ]; then
+          echo "$MRELS" | jq -c '.[]' 2>/dev/null | while read -r rel; do
+            sd=$(echo "$rel" | jq -r '.id // empty')
+            sdt=$(echo "$rel" | jq -r '.type // "depends"')
+            sdr=$(echo "$rel" | jq -r '.register // empty')
+            [ -z "$sd" ] && continue
+            [ -z "$sdr" ] && continue
+
+            # Skip if sub-dep or any of its known IDs already in manifest
+            if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
+              continue
             fi
-            SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
-            for sd in $SUB_DEPS; do
-              SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
-              # Fallback: old-style top-level "registers" object
-              [ -z "$SD_URL" ] && SD_URL=$(jq -r --arg d "$sd" '.registers[$d] // empty' "$manifest" 2>/dev/null)
-              if [ -z "$SD_URL" ]; then
-                echo "::error::Missing register for transitive dependency '$sd' of '$dep' in $manifest"
-                exit 1
-              fi
-              # Already in manifest?
-              if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
-                continue
-              fi
-              SD_URL="${SD_URL#git+}"
-              SD_URL="${SD_URL#upm:}"
-              echo "    $sd → $SD_URL"
-              jq --arg d "$sd" --arg u "$SD_URL" '.dependencies[$d] = $u' \
-                "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
-              NEW_DEPS="$NEW_DEPS $sd"
-            done
-          fi
-        done
-        rm -rf "$TMPDIR"
+
+            sdr="${sdr#git+}"; sdr="${sdr#upm:}"; sdr="${sdr#nuget:}"
+            echo "    $sd → $sdr"
+            jq --arg d "$sd" --arg u "$sdr" '.dependencies[$d] = $u' \
+              "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+            NEW_DEPS="$NEW_DEPS $sd"
+          done
+        fi
         ;;
     esac
   done
   RESOLVED_DEPS="$NEW_DEPS"
 done
 
-# ── Final pass: normalize keys to match each package's own id ──
+# ── Final pass: normalize keys to each package's own id ──
 echo ""
 echo "=== Normalizing manifest keys ==="
 for key in $(jq -r '.dependencies | keys[]' "$PROJECT_DIR/Packages/manifest.json"); do
   URL=$(jq -r --arg k "$key" '.dependencies[$k]' "$PROJECT_DIR/Packages/manifest.json")
   case "$URL" in
     http*)
-      CLONE_URL="${URL%%\?*}"
-      TMPDIR=$(mktemp -d)
-      if git clone --depth 1 "$CLONE_URL" "$TMPDIR" 2>/dev/null; then
-        for mf in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
-          if [ -f "$mf" ]; then
-            REAL_ID=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
-            if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ] && [ "$REAL_ID" != "$key" ]; then
-              echo "  $key → $REAL_ID"
-              jq --arg old "$key" --arg new "$REAL_ID" --arg u "$URL" \
-                'del(.dependencies[$old]) | .dependencies[$new] = $u' \
-                "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
-            fi
-            break
-          fi
-        done
-        rm -rf "$TMPDIR"
+      MANIFEST_DATA=$(fetch_manifest "$URL")
+      if [ -n "$MANIFEST_DATA" ]; then
+        REAL_ID=$(echo "$MANIFEST_DATA" | cut -d'|' -f1)
+        if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ] && [ "$REAL_ID" != "$key" ]; then
+          echo "  $key → $REAL_ID"
+          jq --arg old "$key" --arg new "$REAL_ID" --arg u "$URL" \
+            'del(.dependencies[$old]) | .dependencies[$new] = $u' \
+            "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+        fi
       fi
       ;;
   esac
