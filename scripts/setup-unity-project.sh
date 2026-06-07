@@ -28,30 +28,8 @@ echo "m_EditorVersion: $UNITY_VER" > "$PROJECT_DIR/ProjectSettings/ProjectVersio
 cat > "$PROJECT_DIR/Packages/manifest.json" << 'MANIFEST'
 {
   "dependencies": {
-    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
-    "com.unity.nuget.newtonsoft-json": "3.2.2",
-    "com.unity.modules.audio": "1.0.0",
-    "com.unity.modules.unitywebrequest": "1.0.0",
-    "com.unity.modules.unitywebrequestassetbundle": "1.0.0",
-    "com.unity.modules.unitywebrequestaudio": "1.0.0",
-    "com.unity.modules.unitywebrequesttexture": "1.0.0",
-    "com.unity.modules.unitywebrequestwww": "1.0.0",
-    "com.unity.modules.imageconversion": "1.0.0",
-    "com.unity.modules.imgui": "1.0.0",
-    "com.unity.modules.jsonserialize": "1.0.0",
-    "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.animation": "1.0.0",
-    "com.unity.modules.androidjni": "1.0.0",
-    "com.unity.modules.assetbundle": "1.0.0",
-    "com.unity.modules.ui": "1.0.0",
-    "com.unity.modules.uielements": "1.0.0",
-    "com.unity.2d.sprite": "1.0.0",
-    "com.unity.animation.rigging": "1.4.1",
-    "com.unity.inputsystem": "1.19.0",
-    "com.unity.render-pipelines.universal": "17.5.0",
-    "com.unity.scriptablebuildpipeline": "2.6.1",
-    "com.unity.ugui": "2.0.0",
-    "com.unity.xr.openxr": "1.17.0-pre.1"
+    "nox.loader": "https://github.com/AtelierVR/nox.loader.git",
+    "nox.game.builder": "https://github.com/AtelierVR/nox.game.builder.git"
   }
 }
 MANIFEST
