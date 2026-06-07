@@ -49,9 +49,16 @@ for dep in $DEPS; do
     echo "::error::Missing register for dependency '$dep' in $MANIFEST"
     exit 1
   fi
-  URL="${URL#git+}"; URL="${URL#upm:}"; URL="${URL#nuget:}"
-  echo "  $dep → $URL"
-  jq --arg d "$dep" --arg u "$URL" '.dependencies[$d] = $u' \
+  # Strip scheme, extract version for upm+
+  case "$URL" in
+    git+*)   URL="${URL#git+}" ;;
+    upm+*)   URL="${URL##*@}" ;;
+    upm:*)   URL="${URL#upm:}" ;;
+    nuget:*) URL="${URL#nuget:}" ;;
+  esac
+  MANIFEST_URL="$URL"
+  echo "  $dep → $MANIFEST_URL"
+  jq --arg d "$dep" --arg u "$MANIFEST_URL" '.dependencies[$d] = $u' \
     "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
 done
 
@@ -66,7 +73,41 @@ fetch_manifest() {
   local repo="$1" mf id provides relations subpath
   repo="${repo#git+}"
 
-  # Extract subpath from ?path=... (UPM git URLs)
+  # UPM: fetch from package registry. Format: upm+<url>[@<version>]
+  # Default server: https://packages.unity.com/
+  case "$repo" in
+    upm:*|upm+*)
+      local upm_url="$repo"
+      upm_url="${upm_url#upm+}"
+      upm_url="${upm_url#upm:}"
+      local upm_version=""
+      case "$upm_url" in
+        *@*)
+          upm_version="${upm_url##*@}"
+          upm_url="${upm_url%@*}"
+          ;;
+      esac
+      case "$upm_url" in
+        http*) ;;
+        *) upm_url="https://packages.unity.com/$upm_url" ;;
+      esac
+      local content=$(curl -sL "$upm_url" 2>/dev/null)
+      if echo "$content" | jq -e '.name or .id' > /dev/null 2>&1; then
+        id=$(echo "$content" | jq -r '.name // .id // empty')
+        # Resolve version: use provided, or "@latest", or latest from server
+        if [ -z "$upm_version" ] || [ "$upm_version" = "latest" ]; then
+          upm_version=$(echo "$content" | jq -r '.["dist-tags"].latest // .version // empty')
+        fi
+        provides=""
+        relations=$(echo "$content" | jq -c '[.dependencies | to_entries[]? | {id: .key, type: "depends", register: ("upm+" + .value)}]' 2>/dev/null)
+        echo "$id|$provides|$relations|$upm_version"
+        return 0
+      fi
+      return 1
+      ;;
+  esac
+
+  # Git: clone --depth 1, extract subpath from ?path=...
   subpath=""
   case "$repo" in
     *\?path=*)
@@ -141,9 +182,15 @@ while [ -n "$RESOLVED_DEPS" ]; do
               continue
             fi
 
-            sdr="${sdr#git+}"; sdr="${sdr#upm:}"; sdr="${sdr#nuget:}"
-            echo "    $sd → $sdr"
-            jq --arg d "$sd" --arg u "$sdr" '.dependencies[$d] = $u' \
+            case "$sdr" in
+              git+*)   sdr="${sdr#git+}" ;;
+              upm+*)   sdr="${sdr##*@}" ;;
+              upm:*)   sdr="${sdr#upm:}" ;;
+              nuget:*) sdr="${sdr#nuget:}" ;;
+            esac
+            MURL="$sdr"
+            echo "    $sd → $MURL"
+            jq --arg d "$sd" --arg u "$MURL" '.dependencies[$d] = $u' \
               "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
             NEW_DEPS="$NEW_DEPS $sd"
           done
