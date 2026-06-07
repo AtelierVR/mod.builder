@@ -101,7 +101,7 @@ jobs:
           manualExit: true
           customParameters: >-
             -noxModToBuild ${{ steps.meta.outputs.mod_id }}
-            -noxOutputPath Packages/${{ steps.meta.outputs.mod_id }}/build/${{ steps.meta.outputs.mod_id }}
+            -noxOutputPath build/${{ steps.meta.outputs.mod_id }}
 
       - name: Post-build
         if: always()
@@ -109,7 +109,7 @@ jobs:
         run: |
           echo "::group::Post-build"
           MOD_ID="${{ steps.meta.outputs.mod_id }}"
-          OUTPUT="project/Packages/$MOD_ID/build/$MOD_ID"
+          OUTPUT="project/build/$MOD_ID"
           if [ -d "$OUTPUT" ]; then
             DLLS=$(find "$OUTPUT" -name "*.dll" | wc -l)
             BUNDLES=$(find "$OUTPUT" -name "*.assets" -o -name "*.scenes" -o -name "*.scriptables" | wc -l)
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: bash .mod-builder/scripts/package-mod.sh \
           "$MOD_ID" \
-          "project/Packages/$MOD_ID/build/$MOD_ID"
+          "project/build/$MOD_ID"
 
       - uses: actions/upload-artifact@v4
         with:
