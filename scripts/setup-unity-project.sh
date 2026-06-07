@@ -104,7 +104,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
         for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
           [ -f "$manifest" ] || continue
           TYPE=$(jq -r '.type // "mod"' "$manifest")
-          if [ "$TYPE" = "library" ]; then
+          if [ "$TYPE" = "library" ] || [ "$TYPE" = "mod" ]; then
             echo "  → resolving library: $dep"
             SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
             for sd in $SUB_DEPS; do
