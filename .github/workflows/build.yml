@@ -37,8 +37,10 @@ jobs:
         id: meta
         shell: bash
         run: |
-          echo "mod_id=$(jq -r '.id' mod/nox.mod.jsonc)" >> $GITHUB_OUTPUT
-          V="${VERSION_INPUT:-$(jq -r '.version' mod/nox.mod.jsonc)}"
+          MANIFEST="mod/nox.mod.json"
+          [ -f "$MANIFEST" ] || MANIFEST="mod/nox.mod.jsonc"
+          echo "mod_id=$(jq -r '.id' "$MANIFEST")" >> $GITHUB_OUTPUT
+          V="${VERSION_INPUT:-$(jq -r '.version' "$MANIFEST")}"
           echo "version=$V" >> $GITHUB_OUTPUT
         env:
           VERSION_INPUT: ${{ inputs.version }}
@@ -55,7 +57,8 @@ jobs:
         run: |
           MOD_ID="${{ steps.meta.outputs.mod_id }}"
           V="${{ steps.meta.outputs.version }}"
-          MANIFEST="project/Packages/$MOD_ID/nox.mod.jsonc"
+          MANIFEST="project/Packages/$MOD_ID/nox.mod.json"
+          [ -f "$MANIFEST" ] || MANIFEST="project/Packages/$MOD_ID/nox.mod.jsonc"
           echo "Setting version: $MOD_ID → $V"
           jq --arg v "$V" '.version = $v' "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
 
