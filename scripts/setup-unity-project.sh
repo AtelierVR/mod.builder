@@ -56,6 +56,50 @@ for dep in $DEPS; do
     && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
 done
 
+# ── 3b. Recursive: resolve transitive deps from library manifests ──
+RESOLVED_DEPS="$DEPS"
+while [ -n "$RESOLVED_DEPS" ]; do
+  NEW_DEPS=""
+  for dep in $RESOLVED_DEPS; do
+    # Only recurse into git dependencies (not upm/nuget)
+    URL=$(jq -r --arg d "$dep" '.registers[$d] // empty' "$MOD_DIR/nox.mod.jsonc")
+    [ -z "$URL" ] && continue
+    case "$URL" in
+      git+*|http*)
+        REPO_URL="${URL#git+}"
+        # Use a unique temp dir
+        TMPDIR=$(mktemp -d)
+        if git clone --depth 1 "$REPO_URL" "$TMPDIR" 2>/dev/null; then
+          for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
+            [ -f "$manifest" ] || continue
+            TYPE=$(jq -r '.type // "mod"' "$manifest")
+            if [ "$TYPE" = "library" ]; then
+              echo "  → resolving library: $dep"
+              SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
+              for sd in $SUB_DEPS; do
+                SD_URL=$(jq -r --arg d "$sd" '.registers[$d] // empty' "$manifest" 2>/dev/null)
+                [ -z "$SD_URL" ] && continue
+                # Already in manifest?
+                if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
+                  continue
+                fi
+                SD_URL="${SD_URL#git+}"
+                SD_URL="${SD_URL#upm:}"
+                echo "    $sd → $SD_URL"
+                jq --arg d "$sd" --arg u "$SD_URL" '.dependencies[$d] = $u' \
+                  "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+                NEW_DEPS="$NEW_DEPS $sd"
+              done
+            fi
+          done
+          rm -rf "$TMPDIR"
+        fi
+        ;;
+    esac
+  done
+  RESOLVED_DEPS="$NEW_DEPS"
+done
+
 echo ""
 echo "=== Final manifest ==="
 jq '.dependencies' "$PROJECT_DIR/Packages/manifest.json"
