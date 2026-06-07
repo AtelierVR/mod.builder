@@ -11,6 +11,10 @@ BUILD_DIR="${2:-build}"
 
 OUTPUT_DIR="${GITHUB_WORKSPACE:-.}"
 
+echo "BUILD_DIR=$BUILD_DIR"
+echo "exists: $(test -d "$BUILD_DIR" && echo yes || echo no)"
+ls -la "$BUILD_DIR" 2>&1 || true
+
 cd "$BUILD_DIR"
 zip -r "$OUTPUT_DIR/$MOD_ID.noxmod" .
 echo "Packaged: $OUTPUT_DIR/$MOD_ID.noxmod"
