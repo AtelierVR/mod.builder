@@ -70,7 +70,7 @@ jobs:
 
 ```bash
 # Windows
-iwr -UseBasicParsing https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.ps1 | iex
+irm https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.ps1 | iex
 
 # Linux / Mac
 curl -sSL https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.sh | bash
