@@ -224,7 +224,7 @@ done
 
 echo ""
 echo "=== Final manifest ==="
-jq '.dependencies' "$PROJECT_DIR/Packages/manifest.json"
+cat "$PROJECT_DIR/Packages/manifest.json"
 
 # ── Annotate: list all deps with registers ──
 DEPS_COUNT=$(jq '.dependencies | length' "$PROJECT_DIR/Packages/manifest.json")
