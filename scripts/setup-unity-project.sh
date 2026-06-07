@@ -71,7 +71,7 @@ fetch_manifest() {
 
   for branch in main master; do
     for mf in nox.mod.json nox.mod.jsonc package.json; do
-      raw="https://raw.githubusercontent.com/$repo/$branch/$mf"
+      raw="https://raw.githubusercontent.com/$repo/refs/heads/$branch/$mf"
       content=$(curl -sL "$raw" 2>/dev/null)
       if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
         id=$(echo "$content" | jq -r '.id // .name // empty')
