@@ -5,24 +5,32 @@
 # ────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-echo "🔧 mod.builder — Unity secrets setup"
+ok()   { printf '\033[42m\033[30m[  OK  ]\033[0m %s\n' "$*"; }
+fail() { printf '\033[41m\033[30m[FAILED]\033[0m %s\n' "$*"; }
+info() { printf '\033[44m\033[30m[ INFO ]\033[0m %s\n' "$*"; }
+
+echo ""
+echo "  mod.builder — Unity secrets setup"
 echo ""
 
-# Check gh CLI
 if ! command -v gh &>/dev/null; then
-  echo "❌ GitHub CLI (gh) not found. Install: https://cli.github.com"
+  fail "GitHub CLI not found. Install: https://cli.github.com"
   exit 1
 fi
 
 if ! gh auth status &>/dev/null; then
-  echo "❌ Not logged in. Run: gh auth login"
+  fail "Not logged in. Run: gh auth login"
   exit 1
 fi
 
+secret_exists() {
+  gh secret list 2>/dev/null | grep -q "$1"
+}
+
 # UNITY_LICENSE
 echo "── UNITY_LICENSE ──"
-if gh secret list 2>/dev/null | grep -q UNITY_LICENSE; then
-  echo "  Already set."
+if secret_exists "UNITY_LICENSE"; then
+  info "Already set."
 else
   case "$(uname -s)" in
     Linux*)  LICENSE=$(cat ~/.local/share/unity3d/Unity/Unity_lic.ulf 2>/dev/null || echo "") ;;
@@ -31,34 +39,35 @@ else
   esac
   if [ -n "$LICENSE" ]; then
     echo "$LICENSE" | gh secret set UNITY_LICENSE
-    echo "  ✅ Set from local Unity install."
+    ok "Set from local Unity install."
   else
-    read -rp "  Paste Unity license (.ulf file content): " LICENSE
+    read -rp "  Paste Unity license (.ulf content): " LICENSE
     echo "$LICENSE" | gh secret set UNITY_LICENSE
-    echo "  ✅ Set."
+    ok "Set."
   fi
 fi
 
 # UNITY_EMAIL
 echo "── UNITY_EMAIL ──"
-if gh secret list 2>/dev/null | grep -q UNITY_EMAIL; then
-  echo "  Already set."
+if secret_exists "UNITY_EMAIL"; then
+  info "Already set."
 else
   read -rp "  Unity account email: " EMAIL
   gh secret set UNITY_EMAIL --body "$EMAIL"
-  echo "  ✅ Set."
+  ok "Set."
 fi
 
 # UNITY_PASSWORD
 echo "── UNITY_PASSWORD ──"
-if gh secret list 2>/dev/null | grep -q UNITY_PASSWORD; then
-  echo "  Already set."
+if secret_exists "UNITY_PASSWORD"; then
+  info "Already set."
 else
   read -rsp "  Unity account password: " PASSWORD
   echo ""
   gh secret set UNITY_PASSWORD --body "$PASSWORD"
-  echo "  ✅ Set."
+  ok "Set."
 fi
 
 echo ""
-echo "✅ All secrets configured."
+echo "── Result ──"
+ok "All secrets configured."

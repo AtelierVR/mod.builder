@@ -1,59 +1,69 @@
-# ────────────────────────────────────────────────────────────────
 # Setup Unity secrets for a mod repo
-# Usage: iwr https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.ps1 | iex
-# ────────────────────────────────────────────────────────────────
+# Usage: iwr -UseBasicParsing https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.ps1 | iex
+
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔧 mod.builder — Unity secrets setup" -ForegroundColor Cyan
+function Ok  ($msg) { Write-Host "[  OK  ]" -ForegroundColor White -BackgroundColor Green -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Fail($msg) { Write-Host "[FAILED]" -ForegroundColor White -BackgroundColor Red   -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Info($msg) { Write-Host "[ INFO ]" -ForegroundColor White -BackgroundColor Blue  -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Sep ($msg) { Write-Host ""; Write-Host "--- $msg ---" }
+
+Write-Host ""
+Write-Host "  mod.builder -- Unity secrets setup" -ForegroundColor Cyan
 Write-Host ""
 
-# Check gh CLI
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-  Write-Host "❌ GitHub CLI (gh) not found. Install: winget install GitHub.cli" -ForegroundColor Red
+  Fail "GitHub CLI not found. Install: winget install GitHub.cli"
   exit 1
 }
 
-# UNITY_LICENSE
-Write-Host "── UNITY_LICENSE ──"
-$existing = gh secret list 2>$null | Select-String UNITY_LICENSE
-if ($existing) {
-  Write-Host "  Already set."
+$ErrorActionPreference = "Continue"
+gh auth status *>$null
+if ($LASTEXITCODE -ne 0) {
+  Fail "Not logged in. Run: gh auth login"
+  exit 1
+}
+$ErrorActionPreference = "Stop"
+
+function Test-SecretExists($name) {
+  gh secret list 2>&1 | Select-String $name | Out-Null
+  return $?
+}
+
+Sep "UNITY_LICENSE"
+if (Test-SecretExists "UNITY_LICENSE") {
+  Info "Already set."
 } else {
-  $licensePath = "$env:PROGRAMDATA\Unity\Unity_lic.ulf"
-  if (Test-Path $licensePath) {
-    $license = Get-Content $licensePath -Raw
-    $license | gh secret set UNITY_LICENSE
-    Write-Host "  ✅ Set from local Unity install." -ForegroundColor Green
+  $p = "$env:PROGRAMDATA\Unity\Unity_lic.ulf"
+  if (Test-Path $p) {
+    Get-Content $p -Raw | gh secret set UNITY_LICENSE
+    Ok "Set from local Unity install."
   } else {
-    $license = Read-Host "  Paste Unity license (.ulf file content)"
+    $license = Read-Host "  Paste Unity license (.ulf content)"
     $license | gh secret set UNITY_LICENSE
-    Write-Host "  ✅ Set." -ForegroundColor Green
+    Ok "Set."
   }
 }
 
-# UNITY_EMAIL
-Write-Host "── UNITY_EMAIL ──"
-$existing = gh secret list 2>$null | Select-String UNITY_EMAIL
-if ($existing) {
-  Write-Host "  Already set."
+Sep "UNITY_EMAIL"
+if (Test-SecretExists "UNITY_EMAIL") {
+  Info "Already set."
 } else {
   $email = Read-Host "  Unity account email"
   gh secret set UNITY_EMAIL --body "$email"
-  Write-Host "  ✅ Set." -ForegroundColor Green
+  Ok "Set."
 }
 
-# UNITY_PASSWORD
-Write-Host "── UNITY_PASSWORD ──"
-$existing = gh secret list 2>$null | Select-String UNITY_PASSWORD
-if ($existing) {
-  Write-Host "  Already set."
+Sep "UNITY_PASSWORD"
+if (Test-SecretExists "UNITY_PASSWORD") {
+  Info "Already set."
 } else {
-  $password = Read-Host "  Unity account password" -AsSecureString
-  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
-  $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
-  gh secret set UNITY_PASSWORD --body "$plain"
-  Write-Host "  ✅ Set." -ForegroundColor Green
+  $pw = Read-Host "  Unity account password" -AsSecureString
+  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw)
+  gh secret set UNITY_PASSWORD --body ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr))
+  Ok "Set."
 }
 
 Write-Host ""
-Write-Host "✅ All secrets configured." -ForegroundColor Green
+Sep "Result"
+Ok "All secrets configured."
