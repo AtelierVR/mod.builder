@@ -1,0 +1,23 @@
+# ═══════════════════════════════════════════════════════════════
+# Reusable — validate mod structure
+# ═══════════════════════════════════════════════════════════════
+
+name: Check
+
+on:
+  workflow_call: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: AtelierVR/mod.builder
+          path: .mod-builder
+
+      - name: Validate structure
+        shell: bash
+        run: bash .mod-builder/scripts/check-structure.sh .

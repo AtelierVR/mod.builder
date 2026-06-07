@@ -1,0 +1,80 @@
+# ═══════════════════════════════════════════════════════════════
+# Reusable — build any Nox mod (DLLs + AssetBundles)
+# ═══════════════════════════════════════════════════════════════
+
+name: Build Mod
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ""
+        description: "Version to pass to Unity BuildMod"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      mod_id: ${{ steps.meta.outputs.mod_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mod
+
+      - uses: actions/checkout@v4
+        with:
+          repository: AtelierVR/mod.builder
+          path: .mod-builder
+
+      - name: Read metadata
+        id: meta
+        shell: bash
+        run: |
+          echo "mod_id=$(jq -r '.id' mod/nox.mod.jsonc)" >> $GITHUB_OUTPUT
+          V="${VERSION_INPUT:-$(jq -r '.version' mod/nox.mod.jsonc)}"
+          echo "version=$V" >> $GITHUB_OUTPUT
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+
+      - name: Setup project
+        env:
+          MOD_ID: ${{ steps.meta.outputs.mod_id }}
+          MOD_DIR: mod
+        shell: bash
+        run: bash .mod-builder/scripts/setup-unity-project.sh
+
+      - uses: actions/cache@v4
+        with:
+          path: project/Library
+          key: Library-${{ steps.meta.outputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
+          restore-keys: Library-${{ steps.meta.outputs.mod_id }}-
+
+      - uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: project
+          unityVersion: 6000.4.4f1
+          targetPlatform: StandaloneWindows64
+          buildMethod: Nox.GameBuilder.Pipeline.ExternalBuilder.BuildMod
+          allowDirtyBuild: true
+          manualExit: true
+          customParameters: >-
+            -noxModToBuild ${{ steps.meta.outputs.mod_id }}
+            -noxOutputPath Packages/${{ steps.meta.outputs.mod_id }}/build/${{ steps.meta.outputs.mod_id }}
+
+      - name: Package
+        env:
+          MOD_ID: ${{ steps.meta.outputs.mod_id }}
+        shell: bash
+        run: bash .mod-builder/scripts/package-mod.sh \
+          "$MOD_ID" \
+          "project/Packages/$MOD_ID/build/$MOD_ID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.mod_id }}-mod
+          path: ${{ steps.meta.outputs.mod_id }}.noxmod
