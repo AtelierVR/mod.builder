@@ -1,5 +1,5 @@
 # Setup Unity secrets for a mod repo
-# Usage: irm https://raw.githubusercontent.com/AtelierVR/mod.builder/main/scripts/setup-secrets.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/AtelierVR/mod.builder/refs/heads/main/scripts/setup-secrets.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
