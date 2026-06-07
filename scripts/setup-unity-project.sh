@@ -36,12 +36,12 @@ MANIFEST
 
 # ── 3. Resolve dependencies from registers ─────────────────────
 DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id] | .[]' \
-  "$MOD_DIR/nox.mod.jsonc" 2>/dev/null || echo "")
+  "$MOD_DIR/nox.mod.json" 2>/dev/null || echo "")
 
 for dep in $DEPS; do
-  URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
+  URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.json")
   if [ -z "$URL" ]; then
-    echo "::error::Missing register for dependency '$dep' in $MOD_DIR/nox.mod.jsonc"
+    echo "::error::Missing register for dependency '$dep' in $MOD_DIR/nox.mod.json"
     exit 1
   fi
 
@@ -58,7 +58,7 @@ for dep in $DEPS; do
       VERIFY_URL="${URL%%\?*}"
       if ! git ls-remote --heads "$VERIFY_URL" &>/dev/null; then
         echo "::error::Git repository unreachable for '$dep': $VERIFY_URL"
-        echo "::error::Check the register URL in $MOD_DIR/nox.mod.jsonc"
+        echo "::error::Check the register URL in $MOD_DIR/nox.mod.json"
         exit 1
       fi
       ;;
@@ -85,7 +85,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
     RESOLVED_IDS="$RESOLVED_IDS $dep"
 
     # Only recurse into git dependencies (not upm/nuget)
-    URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
+    URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.json")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
     [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
     if [ -z "$URL" ]; then
@@ -104,7 +104,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
           rm -rf "$TMPDIR"
           exit 1
         fi
-        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
+        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.json"; do
           [ -f "$manifest" ] || continue
           TYPE=$(jq -r '.type // "mod"' "$manifest")
           if [ "$TYPE" = "library" ] || [ "$TYPE" = "mod" ]; then
