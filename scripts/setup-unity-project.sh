@@ -84,9 +84,9 @@ while [ -n "$RESOLVED_DEPS" ]; do
     # Only recurse into git dependencies (not upm/nuget)
     URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
+    [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
     if [ -z "$URL" ]; then
-      echo "::warning::Cannot recurse into '$dep': no register in mod manifest or builder registries"
-      continue
+      continue  # not a Nox library, no register to recurse into
     fi
     case "$URL" in
       git+*|http*)
@@ -109,6 +109,8 @@ while [ -n "$RESOLVED_DEPS" ]; do
             SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
             for sd in $SUB_DEPS; do
               SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
+              # Fallback: old-style top-level "registers" object
+              [ -z "$SD_URL" ] && SD_URL=$(jq -r --arg d "$sd" '.registers[$d] // empty' "$manifest" 2>/dev/null)
               if [ -z "$SD_URL" ]; then
                 echo "::warning::Transitive dependency '$sd' of '$dep' has no register — skipping (may cause compilation errors)"
                 continue
