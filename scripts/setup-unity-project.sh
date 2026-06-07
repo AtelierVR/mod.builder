@@ -58,8 +58,10 @@ for dep in $DEPS; do
   # Verify git repos exist before adding to manifest
   case "$URL" in
     http*)
-      if ! git ls-remote --heads "$URL" &>/dev/null; then
-        echo "::error::Git repository unreachable for '$dep': $URL"
+      # Strip UPM query params (?path=...) for git ls-remote
+      VERIFY_URL="${URL%%\?*}"
+      if ! git ls-remote --heads "$VERIFY_URL" &>/dev/null; then
+        echo "::error::Git repository unreachable for '$dep': $VERIFY_URL"
         echo "::error::Check the register URL in $MOD_DIR/nox.mod.jsonc"
         exit 1
       fi
