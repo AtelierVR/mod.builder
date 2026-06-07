@@ -99,33 +99,32 @@ while [ -n "$RESOLVED_DEPS" ]; do
           rm -rf "$TMPDIR"
           exit 1
         fi
-          for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
-            [ -f "$manifest" ] || continue
-            TYPE=$(jq -r '.type // "mod"' "$manifest")
-            if [ "$TYPE" = "library" ]; then
-              echo "  → resolving library: $dep"
-              SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
-              for sd in $SUB_DEPS; do
-                SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
-                if [ -z "$SD_URL" ]; then
-                  echo "::warning::Transitive dependency '$sd' of '$dep' has no register — skipping (may cause compilation errors)"
-                  continue
-                fi
-                # Already in manifest?
-                if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
-                  continue
-                fi
-                SD_URL="${SD_URL#git+}"
-                SD_URL="${SD_URL#upm:}"
-                echo "    $sd → $SD_URL"
-                jq --arg d "$sd" --arg u "$SD_URL" '.dependencies[$d] = $u' \
-                  "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
-                NEW_DEPS="$NEW_DEPS $sd"
-              done
-            fi
-          done
-          rm -rf "$TMPDIR"
-        fi
+        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
+          [ -f "$manifest" ] || continue
+          TYPE=$(jq -r '.type // "mod"' "$manifest")
+          if [ "$TYPE" = "library" ]; then
+            echo "  → resolving library: $dep"
+            SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
+            for sd in $SUB_DEPS; do
+              SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
+              if [ -z "$SD_URL" ]; then
+                echo "::warning::Transitive dependency '$sd' of '$dep' has no register — skipping (may cause compilation errors)"
+                continue
+              fi
+              # Already in manifest?
+              if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
+                continue
+              fi
+              SD_URL="${SD_URL#git+}"
+              SD_URL="${SD_URL#upm:}"
+              echo "    $sd → $SD_URL"
+              jq --arg d "$sd" --arg u "$SD_URL" '.dependencies[$d] = $u' \
+                "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+              NEW_DEPS="$NEW_DEPS $sd"
+            done
+          fi
+        done
+        rm -rf "$TMPDIR"
         ;;
     esac
   done
