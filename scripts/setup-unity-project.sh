@@ -117,9 +117,9 @@ while [ -n "$RESOLVED_DEPS" ]; do
         # Mark id + all provides as resolved
         RESOLVED_IDS="$RESOLVED_IDS $MID $MPROV"
 
-        # Process sub-deps
+        # Process sub-deps (avoid pipe subshell with for loop)
         if [ "$MRELS" != "null" ] && [ -n "$MRELS" ]; then
-          echo "$MRELS" | jq -c '.[]' 2>/dev/null | while read -r rel; do
+          for rel in $(echo "$MRELS" | jq -c '.[]' 2>/dev/null); do
             sd=$(echo "$rel" | jq -r '.id // empty')
             sdt=$(echo "$rel" | jq -r '.type // "depends"')
             sdr=$(echo "$rel" | jq -r '.register // empty')
