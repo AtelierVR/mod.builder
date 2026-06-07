@@ -120,6 +120,13 @@ jobs:
           fi
           echo "::endgroup::"
 
+      - name: Upload manifest artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.mod_id }}-manifest
+          path: project/Packages/manifest.json
+
       - name: Package
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
