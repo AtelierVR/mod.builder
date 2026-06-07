@@ -20,6 +20,11 @@ echo "Source : $MOD_DIR"
 echo "Project: $PROJECT_DIR"
 echo "Unity  : $UNITY_VER"
 
+# ── 0. Pick the mod manifest (nox.mod.json or nox.mod.jsonc) ──
+MANIFEST="$MOD_DIR/nox.mod.json"
+[ -f "$MANIFEST" ] || MANIFEST="$MOD_DIR/nox.mod.jsonc"
+echo "Manifest: $MANIFEST"
+
 # ── 1. Create Unity project structure ──────────────────────────
 mkdir -p "$PROJECT_DIR/ProjectSettings" "$PROJECT_DIR/Packages" "$PROJECT_DIR/Assets"
 echo "m_EditorVersion: $UNITY_VER" > "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt"
@@ -36,12 +41,12 @@ MANIFEST
 
 # ── 3. Resolve dependencies from registers ─────────────────────
 DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id] | .[]' \
-  "$MOD_DIR/nox.mod.json" 2>/dev/null || echo "")
+  "$MANIFEST" 2>/dev/null || echo "")
 
 for dep in $DEPS; do
-  URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.json")
+  URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MANIFEST")
   if [ -z "$URL" ]; then
-    echo "::error::Missing register for dependency '$dep' in $MOD_DIR/nox.mod.json"
+    echo "::error::Missing register for dependency '$dep' in $MANIFEST"
     exit 1
   fi
 
@@ -58,7 +63,7 @@ for dep in $DEPS; do
       VERIFY_URL="${URL%%\?*}"
       if ! git ls-remote --heads "$VERIFY_URL" &>/dev/null; then
         echo "::error::Git repository unreachable for '$dep': $VERIFY_URL"
-        echo "::error::Check the register URL in $MOD_DIR/nox.mod.json"
+        echo "::error::Check the register URL in $MANIFEST"
         exit 1
       fi
       ;;
@@ -85,7 +90,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
     RESOLVED_IDS="$RESOLVED_IDS $dep"
 
     # Only recurse into git dependencies (not upm/nuget)
-    URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.json")
+    URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MANIFEST")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
     [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '.dependencies[$d] // empty' "$PROJECT_DIR/Packages/manifest.json")
     if [ -z "$URL" ]; then
@@ -104,7 +109,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
           rm -rf "$TMPDIR"
           exit 1
         fi
-        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.json"; do
+        for manifest in "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc"; do
           [ -f "$manifest" ] || continue
           TYPE=$(jq -r '.type // "mod"' "$manifest")
           if [ "$TYPE" = "library" ] || [ "$TYPE" = "mod" ]; then
