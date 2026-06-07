@@ -61,29 +61,26 @@ BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.gi
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
 RESOLVED_IDS=""  # space-separated: id + all provides
 
-# Helper: convert git URL to raw.githubusercontent.com path
-raw_url() {
-  local u="$1" file="$2"
-  u="${u#git+}"
-  u="${u%%.git}"
-  u="${u%%\?*}"                    # strip ?path=...
-  u="${u#https://github.com/}"     # → AtelierVR/repo
-  echo "https://raw.githubusercontent.com/$u/main/$file"
-}
-
-# Helper: fetch manifest, output id + provides + relations as JSON
+# Helper: fetch manifest from raw.githubusercontent.com, try main then master
 fetch_manifest() {
-  local base="$1" mf id provides relations
-  for mf in nox.mod.json nox.mod.jsonc package.json; do
-    local raw=$(raw_url "$base" "$mf")
-    local content=$(curl -sL "$raw" 2>/dev/null)
-    if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
-      id=$(echo "$content" | jq -r '.id // .name // empty')
-      provides=$(echo "$content" | jq -r '[.provides[]?] | join(" ")' 2>/dev/null)
-      relations=$(echo "$content" | jq -c '[.relations[]? | {id,type,register}]' 2>/dev/null)
-      echo "$id|$provides|$relations"
-      return 0
-    fi
+  local repo="$1" mf id provides relations branch raw content
+  repo="${repo#git+}"
+  repo="${repo%%.git}"
+  repo="${repo%%\?*}"
+  repo="${repo#https://github.com/}"
+
+  for branch in main master; do
+    for mf in nox.mod.json nox.mod.jsonc package.json; do
+      raw="https://raw.githubusercontent.com/$repo/$branch/$mf"
+      content=$(curl -sL "$raw" 2>/dev/null)
+      if echo "$content" | jq -e '.id or .name' > /dev/null 2>&1; then
+        id=$(echo "$content" | jq -r '.id // .name // empty')
+        provides=$(echo "$content" | jq -r '[.provides[]?] | join(" ")' 2>/dev/null)
+        relations=$(echo "$content" | jq -c '[.relations[]? | {id,type,register}]' 2>/dev/null)
+        echo "$id|$provides|$relations"
+        return 0
+      fi
+    done
   done
   return 1
 }
