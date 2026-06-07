@@ -50,6 +50,14 @@ jobs:
           key: Library-${{ steps.meta.outputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
           restore-keys: Library-${{ steps.meta.outputs.mod_id }}-
 
+      - name: Init git (required by unity-builder)
+        shell: bash
+        run: |
+          cd project
+          git init
+          git add -A
+          git commit -m "init" --no-verify || true
+
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
