@@ -14,14 +14,14 @@ Write-Host ""
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   Fail "GitHub CLI not found. Install: winget install GitHub.cli"
-  exit 1
+  return
 }
 
 $ErrorActionPreference = "Continue"
 gh auth status *>$null
 if ($LASTEXITCODE -ne 0) {
   Fail "Not logged in. Run: gh auth login"
-  exit 1
+  return
 }
 $ErrorActionPreference = "Stop"
 
