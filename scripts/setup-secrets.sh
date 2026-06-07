@@ -5,9 +5,9 @@
 # ────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-ok()   { printf '\033[42m\033[30m[  OK  ]\033[0m %s\n' "$*"; }
-fail() { printf '\033[41m\033[30m[FAILED]\033[0m %s\n' "$*"; }
-info() { printf '\033[44m\033[30m[ INFO ]\033[0m %s\n' "$*"; }
+ok()   { printf '\033[42m\033[30m   OK   \033[0m %s\n' "$*"; }
+fail() { printf '\033[41m\033[30m FAILED \033[0m %s\n' "$*"; }
+info() { printf '\033[44m\033[30m  INFO  \033[0m %s\n' "$*"; }
 
 echo ""
 echo "  mod.builder — Unity secrets setup"

@@ -3,9 +3,9 @@
 
 $ErrorActionPreference = "Stop"
 
-function Ok  ($msg) { Write-Host "[  OK  ]" -ForegroundColor White -BackgroundColor Green -NoNewline; Write-Host " $msg" -ForegroundColor White }
-function Fail($msg) { Write-Host "[FAILED]" -ForegroundColor White -BackgroundColor Red   -NoNewline; Write-Host " $msg" -ForegroundColor White }
-function Info($msg) { Write-Host "[ INFO ]" -ForegroundColor White -BackgroundColor Blue  -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Ok  ($msg) { Write-Host "   OK   " -ForegroundColor White -BackgroundColor Green -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Fail($msg) { Write-Host " FAILED " -ForegroundColor White -BackgroundColor Red   -NoNewline; Write-Host " $msg" -ForegroundColor White }
+function Info($msg) { Write-Host "  INFO  " -ForegroundColor White -BackgroundColor Blue  -NoNewline; Write-Host " $msg" -ForegroundColor White }
 function Sep ($msg) { Write-Host ""; Write-Host "--- $msg ---" }
 
 Write-Host ""
