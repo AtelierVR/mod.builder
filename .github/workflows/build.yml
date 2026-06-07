@@ -10,14 +10,15 @@ on:
       version:
         type: string
         default: ""
-        description: "Version to pass to Unity BuildMod"
-    secrets:
-      UNITY_LICENSE:
-        required: true
-      UNITY_EMAIL:
-        required: true
-      UNITY_PASSWORD:
-        required: true
+      unity_license:
+        type: string
+        default: ""
+      unity_email:
+        type: string
+        default: ""
+      unity_password:
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -67,9 +68,9 @@ jobs:
 
       - uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ inputs.unity_license }}
+          UNITY_EMAIL: ${{ inputs.unity_email }}
+          UNITY_PASSWORD: ${{ inputs.unity_password }}
         with:
           projectPath: project
           unityVersion: 6000.4.4f1
