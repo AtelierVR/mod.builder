@@ -39,11 +39,9 @@ DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id
   "$MOD_DIR/nox.mod.jsonc" 2>/dev/null || echo "")
 
 for dep in $DEPS; do
-  URL=$(jq -r --arg d "$dep" '.registers[$d] // empty' "$MOD_DIR/nox.mod.jsonc")
-  if [ -z "$URL" ]; then
-    echo "  $dep → NOT FOUND in registers — skipping"
-    continue
-  fi
+  URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
+  [ -z "$URL" ] && URL="git+https://github.com/AtelierVR/${dep}.git"
+  [ -z "$URL" ] && continue
 
   # Strip scheme prefix
   URL="${URL#git+}"
@@ -65,7 +63,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
   NEW_DEPS=""
   for dep in $RESOLVED_DEPS; do
     # Only recurse into git dependencies (not upm/nuget)
-    URL=$(jq -r --arg d "$dep" '.registers[$d] // empty' "$MOD_DIR/nox.mod.jsonc")
+    URL=$(jq -r --arg d "$dep" '.relations[]? | select(.id == $d) | .register // empty' "$MOD_DIR/nox.mod.jsonc")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
     [ -z "$URL" ] && continue
     case "$URL" in
@@ -81,7 +79,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
               echo "  → resolving library: $dep"
               SUB_DEPS=$(jq -r '[.relations[]? | .id] | .[]' "$manifest" 2>/dev/null || echo "")
               for sd in $SUB_DEPS; do
-                SD_URL=$(jq -r --arg d "$sd" '.registers[$d] // empty' "$manifest" 2>/dev/null)
+                SD_URL=$(jq -r --arg d "$sd" '.relations[]? | select(.id == $d) | .register // empty' "$manifest" 2>/dev/null)
                 [ -z "$SD_URL" ] && continue
                 # Already in manifest?
                 if jq -e --arg d "$sd" '.dependencies[$d]' "$PROJECT_DIR/Packages/manifest.json" > /dev/null 2>&1; then
