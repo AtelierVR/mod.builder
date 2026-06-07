@@ -5,7 +5,6 @@ $ErrorActionPreference = "Stop"
 
 function Ok  ($msg) { Write-Host "   OK   " -ForegroundColor White -BackgroundColor Green -NoNewline; Write-Host " $msg" -ForegroundColor White }
 function Fail($msg) { Write-Host " FAILED " -ForegroundColor White -BackgroundColor Red   -NoNewline; Write-Host " $msg" -ForegroundColor White }
-function Info($msg) { Write-Host "  INFO  " -ForegroundColor White -BackgroundColor Blue  -NoNewline; Write-Host " $msg" -ForegroundColor White }
 function Sep ($msg) { Write-Host ""; Write-Host "--- $msg ---" }
 
 Write-Host ""
@@ -31,38 +30,26 @@ function Test-SecretExists($name) {
 }
 
 Sep "UNITY_LICENSE"
-if (Test-SecretExists "UNITY_LICENSE") {
-  Info "Already set."
+$p = "$env:PROGRAMDATA\Unity\Unity_lic.ulf"
+if (Test-Path $p) {
+  Get-Content $p -Raw | gh secret set UNITY_LICENSE
+  Ok "Set from local Unity install."
 } else {
-  $p = "$env:PROGRAMDATA\Unity\Unity_lic.ulf"
-  if (Test-Path $p) {
-    Get-Content $p -Raw | gh secret set UNITY_LICENSE
-    Ok "Set from local Unity install."
-  } else {
-    $license = Read-Host "  Paste Unity license (.ulf content)"
-    $license | gh secret set UNITY_LICENSE
-    Ok "Set."
-  }
+  $license = Read-Host "  Paste Unity license (.ulf content)"
+  $license | gh secret set UNITY_LICENSE
+  Ok "Set."
 }
 
 Sep "UNITY_EMAIL"
-if (Test-SecretExists "UNITY_EMAIL") {
-  Info "Already set."
-} else {
-  $email = if ($env:UNITY_EMAIL) { $env:UNITY_EMAIL } else { Read-Host "  Unity account email" }
-  gh secret set UNITY_EMAIL --body "$email"
-  Ok "Set."
-}
+if ($env:UNITY_EMAIL) { $email = $env:UNITY_EMAIL } else { $email = Read-Host "  Unity account email" }
+gh secret set UNITY_EMAIL --body "$email"
+Ok "Set."
 
 Sep "UNITY_PASSWORD"
-if (Test-SecretExists "UNITY_PASSWORD") {
-  Info "Already set."
-} else {
-  $pw = if ($env:UNITY_PASSWORD) { ConvertTo-SecureString $env:UNITY_PASSWORD -AsPlainText -Force } else { Read-Host "  Unity account password" -AsSecureString }
-  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw)
-  gh secret set UNITY_PASSWORD --body ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr))
-  Ok "Set."
-}
+if ($env:UNITY_PASSWORD) { $pw = ConvertTo-SecureString $env:UNITY_PASSWORD -AsPlainText -Force } else { $pw = Read-Host "  Unity account password" -AsSecureString }
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw)
+gh secret set UNITY_PASSWORD --body ([Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr))
+Ok "Set."
 
 Write-Host ""
 Sep "Result"
