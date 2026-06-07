@@ -11,7 +11,6 @@ BUILD_DIR="${2:-build}"
 
 OUTPUT_DIR="${GITHUB_WORKSPACE:-.}"
 
-cd "${GITHUB_WORKSPACE:-.}"
 cd "$BUILD_DIR"
 zip -r "$OUTPUT_DIR/$MOD_ID.noxmod" .
 echo "Packaged: $OUTPUT_DIR/$MOD_ID.noxmod"
