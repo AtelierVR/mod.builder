@@ -37,6 +37,11 @@ jobs:
         with:
           name: package
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: manifest
+          path: .
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
@@ -44,4 +49,6 @@ jobs:
           prerelease: ${{ inputs.prerelease == 'true' }}
           make_latest: ${{ github.ref == 'refs/heads/main' }}
           generate_release_notes: true
-          files: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip
+          files: |
+            ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip
+            manifest.json
