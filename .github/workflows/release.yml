@@ -50,5 +50,5 @@ jobs:
           make_latest: ${{ github.ref == 'refs/heads/main' }}
           generate_release_notes: true
           files: |
-            ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip
+            ${{ steps.meta.outputs.mod_id }}-*.zip
             manifest.json
