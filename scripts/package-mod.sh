@@ -8,16 +8,21 @@ set -euo pipefail
 
 MOD_ID="${1:-${MOD_ID:?MOD_ID required}}"
 BUILD_DIR="${2:-build}"
+MOD_VERSION="${3:-}"
 
 OUTPUT_DIR="${GITHUB_WORKSPACE:-.}"
 
 cd "${GITHUB_WORKSPACE:-.}"
 cd "$BUILD_DIR"
 
-# Read version from nox.mod.json (fallback to nox.mod.jsonc)
-MANIFEST="nox.mod.json"
-[ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
-VERSION=$(jq -r '.version' "$MANIFEST")
+# Read version from argument or nox.mod.json
+if [ -n "$MOD_VERSION" ]; then
+    VERSION="$MOD_VERSION"
+else
+    MANIFEST="nox.mod.json"
+    [ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
+    VERSION=$(jq -r '.version' "$MANIFEST")
+fi
 # Sanitize version for filename
 VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
 

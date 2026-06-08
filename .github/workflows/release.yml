@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.mod_id }}-mod
+          name: package
 
       - uses: softprops/action-gh-release@v2
         with:

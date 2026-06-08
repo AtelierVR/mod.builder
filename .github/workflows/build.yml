@@ -124,19 +124,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.mod_id }}-manifest
+          name: manifest
           path: project/Packages/manifest.json
 
       - name: Package
         id: package
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
+          MOD_VERSION: ${{ steps.meta.outputs.version }}
         shell: bash
-        run: |
-          ARCHIVE=$(bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" | tail -1)
-          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" "$MOD_VERSION"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.mod_id }}-mod
-          path: ${{ steps.package.outputs.archive }}
+          name: package
+          path: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip
