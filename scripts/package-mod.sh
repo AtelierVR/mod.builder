@@ -64,38 +64,51 @@ DOWNLOAD_BASE="https://github.com/$REPO/releases/download/$TAG"
 CONTACT_URL=$(jq -r '.contact.website // ""' "$MF")
 [ -z "$CONTACT_URL" ] && CONTACT_URL="$MOD_AUTHOR_URL"
 
-# ── Generate manifest.json ────────────────────────────────────
-cat > "$OUTPUT_DIR/manifest.json" << MANIFEST
-{
-  "id": "$MOD_ID",  
-  "provides": $(jq '[.provides[]?] // []' "$MF"),
-  "name": "$NAME",
-  "description": "$DESC",
-  "version": "$VERSION",
-  "license": "$LICENSE",
-  "icon": "$(jq -r '.icon // ""' "$MF")",
-  "url": "$DOWNLOAD_BASE/manifest.json",
-  "author": {
-    "name": "$MOD_AUTHOR",
-    "url": "$CONTACT_URL",
-    "git": "$MOD_SOURCE",
-    "github": "https://github.com/$GIT_USER"
-  },
-  "source": "$MOD_SOURCE",
-  "contributors": $(jq '[.contributors[]? | {name, url: .website, git: (.website // "")}] | if length > 0 then . else [] end' "$MF"),
-  "dependencies": $(jq '[.relations[]? | select(.type == "depends") | {(.id): .register}] | add // {}' "$MF"),
-  "files": [
-    {
-      "file": "$ARCHIVE",
-      "url": "$DOWNLOAD_BASE/$ARCHIVE",
-      "platforms": ["$PLATFORM"],
-      "hash": "sha256:$HASH",
-      "size": $SIZE
-    }
-  ],
-  "generated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-MANIFEST
+# ── Icon (null if empty) ──────────────────────────────────────
+ICON=$(jq -r '.icon // empty' "$MF")
+[ -z "$ICON" ] && ICON="null" || ICON="\"$ICON\""
+
+# ── Build manifest.json step by step ──────────────────────────
+jq -n '{}' \
+  > "$OUTPUT_DIR/manifest.json"
+
+# Helper: set a field
+set_field() { jq --arg k "$1" --arg v "$2" '.[$k] = $v' "$OUTPUT_DIR/manifest.json" > "$OUTPUT_DIR/manifest.tmp" && mv "$OUTPUT_DIR/manifest.tmp" "$OUTPUT_DIR/manifest.json"; }
+set_json()  { jq --arg k "$1" --argjson v "$2" '.[$k] = $v' "$OUTPUT_DIR/manifest.json" > "$OUTPUT_DIR/manifest.tmp" && mv "$OUTPUT_DIR/manifest.tmp" "$OUTPUT_DIR/manifest.json"; }
+
+set_field id "$MOD_ID"
+set_json  provides "$(jq '[.provides[]?] // []' "$MF")"
+set_field name "$NAME"
+set_field description "$DESC"
+set_field version "$VERSION"
+set_field license "$LICENSE"
+set_json  icon "$ICON"
+set_field url "$DOWNLOAD_BASE/manifest.json"
+
+# Author
+set_json author "$(jq -n \
+  --arg name "$MOD_AUTHOR" \
+  --arg url "$CONTACT_URL" \
+  --arg github "$GIT_USER" \
+  '{name: $name, url: $url, github: $github}')"
+
+# Source
+set_json source "$(jq -n --arg url "$MOD_SOURCE" '{type: "git", url: $url}')"
+
+# Contributors & dependencies directly from nox.mod.json
+set_json contributors "$(jq '[.contributors[]? | {name, url: .website, git: (.website // "")}] | if length > 0 then . else [] end' "$MF")"
+set_json dependencies "$(jq '[.relations[]? | select(.type == "depends") | {(.id): .register}] | add // {}' "$MF")"
+
+# Files: iterate over all zips found (future-proof)
+set_json files "$(jq -n \
+  --arg url "$DOWNLOAD_BASE/$ARCHIVE" \
+  --arg platform "$PLATFORM" \
+  --arg hash "sha256:$HASH" \
+  --argjson size "$SIZE" \
+  '[{url: $url, platforms: [$platform], hash: $hash, size: $size}]')"
+
+# Generated timestamp
+set_field generated "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "Manifest: $OUTPUT_DIR/manifest.json"
 ls -lh "$OUTPUT_DIR/$ARCHIVE" "$OUTPUT_DIR/manifest.json"
