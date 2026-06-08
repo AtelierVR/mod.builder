@@ -32,6 +32,7 @@ MOD_NAME=$(jq -r '.name // .id' "$MF")
 MOD_DESC=$(jq -r '.description // ""' "$MF")
 MOD_AUTHOR=$(jq -r '.authors[0].name // ""' "$MF")
 MOD_AUTHOR_URL=$(jq -r '.authors[0].website // ""' "$MF")
+MOD_SOURCE=$(jq -r '.contact.source // ""' "$MF")
 
 # ── Zip ───────────────────────────────────────────────────────
 ARCHIVE="$MOD_ID-$SAFE_VERSION-$PLATFORM.zip"
@@ -41,10 +42,6 @@ echo "Packaged: $OUTPUT_DIR/$ARCHIVE"
 # ── Hash & size ───────────────────────────────────────────────
 HASH=$(sha256sum "$OUTPUT_DIR/$ARCHIVE" | cut -d' ' -f1)
 SIZE=$(stat -c%s "$OUTPUT_DIR/$ARCHIVE" 2>/dev/null || wc -c < "$OUTPUT_DIR/$ARCHIVE")
-
-# ── GitHub repo info ──────────────────────────────────────────
-REPO="${GITHUB_REPOSITORY:-unknown}"
-REPO_OWNER="${REPO%%/*}"
 
 # ── Generate manifest.json ────────────────────────────────────
 cat > "$OUTPUT_DIR/manifest.json" << MANIFEST
@@ -56,14 +53,15 @@ cat > "$OUTPUT_DIR/manifest.json" << MANIFEST
   "author": {
     "name": "$MOD_AUTHOR",
     "url": "$MOD_AUTHOR_URL",
-    "github": "$REPO_OWNER"
+    "git": "$MOD_SOURCE"
   },
-  "contributors": $(jq '[.contributors[]? | {name, url: .website, github: (.website | capture("github\\.com/(?<u>[^/]+)") | .u // "")}] | if length > 0 then . else [] end' "$MF"),
+  "repo": "$MOD_SOURCE",
+  "contributors": $(jq '[.contributors[]? | {name, url: .website, git: (.website // "")}] | if length > 0 then . else [] end' "$MF"),
   "dependencies": $(jq '[.relations[]? | select(.type == "depends") | {(.id): .version // "*"}] | add // {}' "$MF"),
   "files": [
     {
       "file": "$ARCHIVE",
-      "platform": "full",
+      "platform": "$PLATFORM",
       "hash": "sha256:$HASH",
       "size": $SIZE
     }
