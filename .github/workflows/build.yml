@@ -120,22 +120,20 @@ jobs:
           fi
           echo "::endgroup::"
 
-      - name: Upload manifest artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: manifest
-          path: project/Packages/manifest.json
-
       - name: Package
         id: package
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
           MOD_VERSION: ${{ steps.meta.outputs.version }}
         shell: bash
-        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" "$MOD_VERSION"
+        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" "$MOD_VERSION" "full"
 
       - uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}.zip
+          path: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}-full.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifest
+          path: manifest.json
