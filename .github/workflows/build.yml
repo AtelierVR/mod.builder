@@ -125,6 +125,9 @@ jobs:
         env:
           MOD_ID: ${{ steps.meta.outputs.mod_id }}
           MOD_VERSION: ${{ steps.meta.outputs.version }}
+          GH_NAME: ${{ github.event.repository.name }}
+          GH_DESC: ${{ github.event.repository.description }}
+          GH_LICENSE: ${{ github.event.repository.license.spdx_id }}
         shell: bash
         run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" "$MOD_VERSION" "full"
 
