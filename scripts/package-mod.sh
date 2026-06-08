@@ -61,7 +61,7 @@ cat > "$OUTPUT_DIR/manifest.json" << MANIFEST
   "files": [
     {
       "file": "$ARCHIVE",
-      "platform": "$PLATFORM",
+      "platforms": ["$PLATFORM"],
       "hash": "sha256:$HASH",
       "size": $SIZE
     }
