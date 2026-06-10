@@ -34,7 +34,8 @@ cat > "$PROJECT_DIR/Packages/manifest.json" << 'MANIFEST'
 {
   "dependencies": {
     "nox.loader": "https://github.com/AtelierVR/nox.loader.git",
-    "nox.game.builder": "https://github.com/AtelierVR/nox.game.builder.git"
+    "nox.game.builder": "https://github.com/AtelierVR/nox.game.builder.git",
+    "nox.editor": "https://github.com/AtelierVR/nox.editor.git"
   }
 }
 MANIFEST
@@ -63,8 +64,8 @@ for dep in $DEPS; do
 done
 
 # ── 3b. Recursive: fetch manifests via curl, dedup by id+provides ──
-BUILDER_DEPS="nox.loader nox.game.builder"
-BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git"}'
+BUILDER_DEPS="nox.loader nox.game.builder nox.editor"
+BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git","nox.editor":"git+https://github.com/AtelierVR/nox.editor.git"}'
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
 RESOLVED_IDS=""  # space-separated: id + all provides
 
