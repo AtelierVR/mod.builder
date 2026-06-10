@@ -85,18 +85,22 @@ set_field license "$LICENSE"
 set_json  icon "$ICON"
 set_field url "$DOWNLOAD_BASE/manifest.json"
 
-# Author
+# Author = repo owner
 set_json author "$(jq -n \
-  --arg name "$MOD_AUTHOR" \
-  --arg url "$CONTACT_URL" \
-  --arg github "$GIT_USER" \
+  --arg name "$REPO_OWNER" \
+  --arg url "https://github.com/$REPO_OWNER" \
+  --arg github "$REPO_OWNER" \
   '{name: $name, url: $url, github: $github}')"
 
 # Source
 set_json source "$(jq -n --arg url "$MOD_SOURCE" '{type: "git", url: $url}')"
 
-# Contributors & dependencies directly from nox.mod.json
-set_json contributors "$(jq '[.contributors[]? | {name, url: .website, git: (.website // "")}] | if length > 0 then . else [] end' "$MF")"
+# Contributors = mod authors + contributors from nox.mod.json
+set_json contributors "$(jq -s '.[0] + .[1]' \
+  <(jq '[.authors[]? | {name, url: .website // "", github: (.website // "" | capture("github\\.com/(?<u>[^/]+)") | .u // "")}]' "$MF") \
+  <(jq '[.contributors[]? | {name, url: .website, github: (.website // "" | capture("github\\.com/(?<u>[^/]+)") | .u // "")}] | if length > 0 then . else [] end' "$MF"))"
+
+# Dependencies
 set_json dependencies "$(jq '[.relations[]? | select(.type == "depends") | {(.id): .register}] | add // {}' "$MF")"
 
 # Files: iterate over all zips found (future-proof)
