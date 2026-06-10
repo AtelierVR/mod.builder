@@ -120,6 +120,17 @@ jobs:
           fi
           echo "::endgroup::"
 
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-build
+          path: |
+            project/Assets/link.xml
+            project/Packages/manifest.json
+            ~/.nox/logs/latest.log
+            ~/.config/unity3d/Editor.log
+          if-no-files-found: ignore
+
       - name: Package
         id: package
         env:

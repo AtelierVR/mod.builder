@@ -67,7 +67,9 @@ done
 BUILDER_DEPS="nox.loader nox.game.builder nox.editor"
 BUILDER_REGISTERS='{"nox.loader":"git+https://github.com/AtelierVR/nox.loader.git","nox.game.builder":"git+https://github.com/AtelierVR/nox.game.builder.git","nox.editor":"git+https://github.com/AtelierVR/nox.editor.git"}'
 RESOLVED_DEPS="$DEPS $BUILDER_DEPS"
-RESOLVED_IDS=""  # space-separated: id + all provides
+# Skip the mod being built (already placed via file:) — include its id + all provides
+MOD_PROVIDES=$(jq -r '[.provides[]?] | join(" ")' "$MANIFEST" 2>/dev/null || echo "")
+RESOLVED_IDS="$MOD_ID $MOD_PROVIDES"
 
 # Helper: fetch manifest via git clone --depth 1 (single strategy, all hosts)
 fetch_manifest() {
