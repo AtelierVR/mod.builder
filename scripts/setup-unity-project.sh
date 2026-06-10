@@ -231,7 +231,13 @@ DEPS_COUNT=$(jq '.dependencies | length' "$PROJECT_DIR/Packages/manifest.json")
 echo "::notice title=Dependencies::$DEPS_COUNT dependencies resolved"
 jq -r '.dependencies | to_entries[] | "::group::\(.key)\n  register: \(.value)\n::endgroup::"' "$PROJECT_DIR/Packages/manifest.json"
 
-# ── 4. Place mod in Packages/ ──────────────────────────────────
+# ── 4. Place mod in Packages/ and add file: entry to manifest ──
 mkdir -p "$PROJECT_DIR/Packages/$MOD_ID"
 cp -r "$MOD_DIR"/* "$PROJECT_DIR/Packages/$MOD_ID/"
 echo "Mod placed: Packages/$MOD_ID"
+
+# Register the mod as a file: dependency so Unity resolves it locally
+jq --arg id "$MOD_ID" --arg path "file:Packages/$MOD_ID" \
+  '.dependencies[$id] = $path' \
+  "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
+echo "Manifest: added file:Packages/$MOD_ID for $MOD_ID"
