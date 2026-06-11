@@ -10,13 +10,20 @@ on:
       version:
         type: string
         default: ""
+      noLibraryCache:
+        type: boolean
+        default: false
+        description: "Skip restoring the Library cache (use after dependency changes like adding DLLs)"
     secrets:
       UNITY_LICENSE:
         required: true
+        description: "Unity license file content (scripts/get-unity-license.sh)"
       UNITY_EMAIL:
         required: true
+        description: "Unity account email"
       UNITY_PASSWORD:
         required: true
+        description: "Unity account password"
 
 jobs:
   build:
@@ -63,6 +70,7 @@ jobs:
           jq --arg v "$V" '.version = $v' "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
 
       - uses: actions/cache@v4
+        if: ${{ !inputs.noLibraryCache }}
         with:
           path: project/Library
           key: Library-${{ steps.meta.outputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
@@ -100,6 +108,7 @@ jobs:
           allowDirtyBuild: true
           manualExit: true
           customParameters: >-
+            -accept-apiupdate
             -noxModToBuild ${{ steps.meta.outputs.mod_id }}
             -noxOutputPath build/${{ steps.meta.outputs.mod_id }}
 
