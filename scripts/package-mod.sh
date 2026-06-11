@@ -17,8 +17,16 @@ cd "${GITHUB_WORKSPACE:-.}"
 cd "$BUILD_DIR"
 
 # ── Read mod manifest ─────────────────────────────────────────
-MF="nox.mod.json"
-[ -f "$MF" ] || MF="nox.mod.jsonc"
+MF=""
+if [ -f "nox.mod.json" ]; then
+    MF="nox.mod.json"
+else
+    echo "::error::No manifest found (nox.mod.json or nox.mod.jsonc) in $(pwd)"
+    echo "Contents of $(pwd):"
+    ls -la
+    exit 1
+fi
+echo "Using manifest: $MF"
 
 # Read version (arg > manifest)
 if [ -n "$MOD_VERSION" ]; then

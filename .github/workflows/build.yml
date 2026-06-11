@@ -119,13 +119,19 @@ jobs:
           echo "::group::Post-build"
           MOD_ID="${{ steps.meta.outputs.mod_id }}"
           OUTPUT="project/build/$MOD_ID"
+          echo "Expected output: $(realpath "$OUTPUT" 2>/dev/null || echo "$OUTPUT")"
           if [ -d "$OUTPUT" ]; then
+            echo "--- Contents of $OUTPUT ---"
+            ls -laR "$OUTPUT"
+            echo "--- Summary ---"
             DLLS=$(find "$OUTPUT" -name "*.dll" | wc -l)
             BUNDLES=$(find "$OUTPUT" -name "*.assets" -o -name "*.scenes" -o -name "*.scriptables" | wc -l)
             echo "DLLs: $DLLS  AssetBundles: $BUNDLES"
             echo "::notice title=Post-build::$MOD_ID built ($DLLS DLLs, $BUNDLES bundles)"
           else
-            echo "::warning title=Post-build::Build failed, no output found"
+            echo "::warning title=Post-build::Build output folder not found: $OUTPUT"
+            echo "--- Contents of project/build/ (if any) ---"
+            ls -laR project/build/ 2>/dev/null || echo "(build folder does not exist)"
           fi
           echo "::endgroup::"
 
