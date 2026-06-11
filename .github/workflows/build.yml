@@ -95,7 +95,7 @@ jobs:
         with:
           projectPath: project
           unityVersion: 6000.4.4f1
-          targetPlatform: StandaloneLinux64
+          targetPlatform: StandaloneWindows64
           buildMethod: Nox.GameBuilder.Pipeline.ExternalBuilder.BuildMod
           allowDirtyBuild: true
           manualExit: true
