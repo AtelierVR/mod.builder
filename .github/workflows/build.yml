@@ -110,7 +110,7 @@ jobs:
           customParameters: >-
             -accept-apiupdate
             -noxModToBuild ${{ steps.meta.outputs.mod_id }}
-            -noxOutputPath build/${{ steps.meta.outputs.mod_id }}
+            -noxOutputPath build
 
       - name: Post-build
         if: always()
