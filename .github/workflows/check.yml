@@ -5,15 +5,10 @@
 name: Check
 
 on:
-  workflow_call:
-    inputs:
-      valid:
-        type: boolean
-        default: true
+  workflow_call: {}
 
 jobs:
   check:
-    if: ${{ inputs.valid }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
