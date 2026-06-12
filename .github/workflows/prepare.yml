@@ -41,6 +41,10 @@ jobs:
           repository: AtelierVR/mod.builder
           path: .mod-builder
 
+      - name: Mod builder version
+        shell: bash
+        run: bash .mod-builder/scripts/mod-builder-version.sh
+
       - run: git fetch --tags --force
 
       - name: Compute
