@@ -47,5 +47,27 @@ fi
 echo "resolved=$RESOLVED" >> "$GITHUB_OUTPUT"
 echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-echo ">> $TAG (resolved: $RESOLVED, prerelease: $PRERELEASE)"
-echo "::notice title=Version::$TAG"
+
+echo "::group::Version result"
+echo "  resolved  : $RESOLVED"
+echo "  tag       : $TAG"
+echo "  prerelease: $PRERELEASE"
+echo "  branch    : $BRANCH"
+
+if [ "$PRERELEASE" = "true" ]; then
+  echo "::warning title=Version::Pre-release: $TAG (branch: $BRANCH)"
+else
+  echo "::notice title=Version::Release: $TAG"
+fi
+
+# Write to step summary
+echo "# 🏷️ Version: $TAG" >> "$GITHUB_STEP_SUMMARY"
+echo "" >> "$GITHUB_STEP_SUMMARY"
+echo "| Key | Value |" >> "$GITHUB_STEP_SUMMARY"
+echo "|-----|-------|" >> "$GITHUB_STEP_SUMMARY"
+echo "| Tag | \`$TAG\` |" >> "$GITHUB_STEP_SUMMARY"
+echo "| Resolved | $RESOLVED |" >> "$GITHUB_STEP_SUMMARY"
+echo "| Branch | $BRANCH |" >> "$GITHUB_STEP_SUMMARY"
+echo "| Pre-release | $PRERELEASE |" >> "$GITHUB_STEP_SUMMARY"
+
+echo "::endgroup::"

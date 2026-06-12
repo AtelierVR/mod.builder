@@ -7,6 +7,12 @@ name: Release
 on:
   workflow_call:
     inputs:
+      mod_id:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
       tag:
         type: string
         required: true
@@ -22,17 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read mod id
-        id: meta
-        shell: bash
-        run: |
-          MANIFEST="nox.mod.json"
-          [ -f "$MANIFEST" ] || MANIFEST="nox.mod.jsonc"
-          echo "mod_id=$(jq -r '.id' "$MANIFEST")" >> $GITHUB_OUTPUT
-          VERSION=$(jq -r '.version' "$MANIFEST")
-          VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - uses: actions/download-artifact@v4
         with:
           name: package
@@ -45,10 +40,10 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
-          name: ${{ steps.meta.outputs.mod_id }} ${{ inputs.tag }}
+          name: ${{ inputs.mod_id }} ${{ inputs.tag }}
           prerelease: ${{ inputs.prerelease == 'true' }}
           make_latest: ${{ github.ref == 'refs/heads/main' }}
           generate_release_notes: true
           files: |
-            ${{ steps.meta.outputs.mod_id }}-*.zip
+            ${{ inputs.mod_id }}-*.zip
             manifest.json

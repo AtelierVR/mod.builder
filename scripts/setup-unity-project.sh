@@ -15,6 +15,7 @@ MOD_DIR="${2:-${MOD_DIR:?MOD_DIR required}}"
 PROJECT_DIR="${3:-project}"
 UNITY_VER="${UNITY_VERSION:-6000.4.4f1}"
 
+echo "::group::Setup Unity project"
 echo "Mod    : $MOD_ID"
 echo "Source : $MOD_DIR"
 echo "Project: $PROJECT_DIR"
@@ -41,6 +42,7 @@ cat > "$PROJECT_DIR/Packages/manifest.json" << 'MANIFEST'
 MANIFEST
 
 # ── 3. Resolve dependencies (fetch manifests via curl, no full clone) ──
+echo "::group::Resolve dependencies"
 DEPS=$(jq -r '[.relations[]? | select(.type == "depends" or .type == null) | .id] | .[]' \
   "$MANIFEST" 2>/dev/null || echo "")
 

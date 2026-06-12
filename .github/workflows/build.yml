@@ -7,6 +7,9 @@ name: Build Mod
 on:
   workflow_call:
     inputs:
+      mod_id:
+        type: string
+        required: true
       version:
         type: string
         default: ""
@@ -29,7 +32,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      mod_id: ${{ steps.meta.outputs.mod_id }}
+      mod_id: ${{ inputs.mod_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,60 +43,31 @@ jobs:
           repository: AtelierVR/mod.builder
           path: .mod-builder
 
-      - name: Read metadata
-        id: meta
-        shell: bash
-        run: |
-          MANIFEST="mod/nox.mod.json"
-          [ -f "$MANIFEST" ] || MANIFEST="mod/nox.mod.jsonc"
-          echo "mod_id=$(jq -r '.id' "$MANIFEST")" >> $GITHUB_OUTPUT
-          V="${VERSION_INPUT:-$(jq -r '.version' "$MANIFEST")}"
-          echo "version=$V" >> $GITHUB_OUTPUT
-        env:
-          VERSION_INPUT: ${{ inputs.version }}
-
       - name: Setup project
         env:
-          MOD_ID: ${{ steps.meta.outputs.mod_id }}
+          MOD_ID: ${{ inputs.mod_id }}
           MOD_DIR: mod
         shell: bash
         run: bash .mod-builder/scripts/setup-unity-project.sh
 
       - name: Set version
         shell: bash
-        run: |
-          MOD_ID="${{ steps.meta.outputs.mod_id }}"
-          V="${{ steps.meta.outputs.version }}"
-          MANIFEST="project/Packages/$MOD_ID/nox.mod.json"
-          [ -f "$MANIFEST" ] || MANIFEST="project/Packages/$MOD_ID/nox.mod.jsonc"
-          echo "Setting version: $MOD_ID → $V"
-          jq --arg v "$V" '.version = $v' "$MANIFEST" > tmp.json && mv tmp.json "$MANIFEST"
+        run: bash .mod-builder/scripts/set-version.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
       - uses: actions/cache@v4
         if: ${{ !inputs.noLibraryCache }}
         with:
           path: project/Library
-          key: Library-${{ steps.meta.outputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
-          restore-keys: Library-${{ steps.meta.outputs.mod_id }}-
+          key: Library-${{ inputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
+          restore-keys: Library-${{ inputs.mod_id }}-
 
       - name: Init git (required by unity-builder)
         shell: bash
-        run: |
-          cd project
-          git init
-          git config user.email "ci@mod.builder"
-          git config user.name "mod.builder"
-          git add -A
-          git commit -m "init" --no-verify || true
+        run: bash .mod-builder/scripts/init-git.sh
 
       - name: Pre-build
         shell: bash
-        run: |
-          echo "::group::Pre-build"
-          echo "Mod     : ${{ steps.meta.outputs.mod_id }}"
-          echo "Version : ${{ steps.meta.outputs.version }}"
-          echo "::notice title=Pre-build::${{ steps.meta.outputs.mod_id }} v${{ steps.meta.outputs.version }}"
-          echo "::endgroup::"
+        run: bash .mod-builder/scripts/pre-build.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
       - uses: game-ci/unity-builder@v4
         env:
@@ -109,31 +83,13 @@ jobs:
           manualExit: true
           customParameters: >-
             -accept-apiupdate
-            -noxModToBuild ${{ steps.meta.outputs.mod_id }}
+            -noxModToBuild ${{ inputs.mod_id }}
             -noxOutputPath build
 
       - name: Post-build
         if: always()
         shell: bash
-        run: |
-          echo "::group::Post-build"
-          MOD_ID="${{ steps.meta.outputs.mod_id }}"
-          OUTPUT="project/build/$MOD_ID"
-          echo "Expected output: $(realpath "$OUTPUT" 2>/dev/null || echo "$OUTPUT")"
-          if [ -d "$OUTPUT" ]; then
-            echo "--- Contents of $OUTPUT ---"
-            ls -laR "$OUTPUT"
-            echo "--- Summary ---"
-            DLLS=$(find "$OUTPUT" -name "*.dll" | wc -l)
-            BUNDLES=$(find "$OUTPUT" -name "*.assets" -o -name "*.scenes" -o -name "*.scriptables" | wc -l)
-            echo "DLLs: $DLLS  AssetBundles: $BUNDLES"
-            echo "::notice title=Post-build::$MOD_ID built ($DLLS DLLs, $BUNDLES bundles)"
-          else
-            echo "::warning title=Post-build::Build output folder not found: $OUTPUT"
-            echo "--- Contents of project/build/ (if any) ---"
-            ls -laR project/build/ 2>/dev/null || echo "(build folder does not exist)"
-          fi
-          echo "::endgroup::"
+        run: bash .mod-builder/scripts/post-build.sh "${{ inputs.mod_id }}"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -149,8 +105,8 @@ jobs:
       - name: Package
         id: package
         env:
-          MOD_ID: ${{ steps.meta.outputs.mod_id }}
-          MOD_VERSION: ${{ steps.meta.outputs.version }}
+          MOD_ID: ${{ inputs.mod_id }}
+          MOD_VERSION: ${{ inputs.version }}
           GH_NAME: ${{ github.event.repository.name }}
           GH_DESC: ${{ github.event.repository.description }}
           GH_LICENSE: ${{ github.event.repository.license.spdx_id }}
@@ -160,7 +116,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ steps.meta.outputs.mod_id }}-${{ steps.meta.outputs.version }}-full.zip
+          path: ${{ inputs.mod_id }}-${{ inputs.version }}-full.zip
 
       - uses: actions/upload-artifact@v4
         with:

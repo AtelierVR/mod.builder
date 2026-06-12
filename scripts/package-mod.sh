@@ -26,6 +26,7 @@ else
     ls -la
     exit 1
 fi
+echo "::group::Package: $MOD_ID"
 echo "Using manifest: $MF"
 
 # Read version (arg > manifest)
@@ -35,6 +36,8 @@ else
     VERSION=$(jq -r '.version' "$MF")
 fi
 SAFE_VERSION="${VERSION//[^a-zA-Z0-9._-]/-}"
+echo "Version: $VERSION (safe: $SAFE_VERSION)"
+echo "Platform: $PLATFORM"
 
 MOD_NAME=$(jq -r '.name // .id' "$MF")
 MOD_DESC=$(jq -r '.description // ""' "$MF")
@@ -49,8 +52,10 @@ LICENSE="${GH_LICENSE:-$(jq -r '.license // ""' "$MF")}"
 
 # ── Zip ───────────────────────────────────────────────────────
 ARCHIVE="$MOD_ID-$SAFE_VERSION-$PLATFORM.zip"
+echo "Creating archive: $ARCHIVE"
 zip -qr "$OUTPUT_DIR/$ARCHIVE" .
 echo "Packaged: $OUTPUT_DIR/$ARCHIVE"
+ls -lh "$OUTPUT_DIR/$ARCHIVE"
 
 # ── Hash & size ───────────────────────────────────────────────
 HASH=$(sha256sum "$OUTPUT_DIR/$ARCHIVE" | cut -d' ' -f1)
@@ -124,3 +129,15 @@ set_field generated "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 echo "Manifest: $OUTPUT_DIR/manifest.json"
 ls -lh "$OUTPUT_DIR/$ARCHIVE" "$OUTPUT_DIR/manifest.json"
+
+echo "::notice title=Package::$MOD_ID v$VERSION packaged ($(du -h "$OUTPUT_DIR/$ARCHIVE" | cut -f1))"
+
+# Write to step summary
+echo "## 📦 Package: $MOD_ID v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+echo "" >> "$GITHUB_STEP_SUMMARY"
+echo "| File | Size | SHA256 |" >> "$GITHUB_STEP_SUMMARY"
+echo "|------|------|--------|" >> "$GITHUB_STEP_SUMMARY"
+echo "| $ARCHIVE | $(du -h "$OUTPUT_DIR/$ARCHIVE" | cut -f1) | \`$HASH\` |" >> "$GITHUB_STEP_SUMMARY"
+echo "| manifest.json | $(du -h "$OUTPUT_DIR/manifest.json" | cut -f1) | |" >> "$GITHUB_STEP_SUMMARY"
+
+echo "::endgroup::"

@@ -1,8 +1,8 @@
 # ═══════════════════════════════════════════════════════════════
-# Reusable — compute next semver, no side effects
+# Reusable — compute next semver + validate, no side effects
 # ═══════════════════════════════════════════════════════════════
 
-name: Version
+name: Prepare
 
 on:
   workflow_call:
@@ -11,20 +11,26 @@ on:
         type: string
         default: ""
     outputs:
-      resolved:
-        value: ${{ jobs.version.outputs.resolved }}
+      mod_id:
+        value: ${{ jobs.version.outputs.mod_id }}
+      version:
+        value: ${{ jobs.version.outputs.version }}
       tag:
         value: ${{ jobs.version.outputs.tag }}
       prerelease:
         value: ${{ jobs.version.outputs.prerelease }}
+      valid:
+        value: ${{ jobs.version.outputs.valid }}
 
 jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      resolved: ${{ steps.semver.outputs.resolved }}
+      mod_id: ${{ steps.meta.outputs.mod_id }}
+      version: ${{ steps.semver.outputs.resolved }}
       tag: ${{ steps.semver.outputs.tag }}
       prerelease: ${{ steps.semver.outputs.prerelease }}
+      valid: ${{ steps.validate.outputs.valid }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,3 +49,13 @@ jobs:
           VERSION_OVERRIDE: ${{ inputs.override }}
         shell: bash
         run: bash .mod-builder/scripts/compute-version.sh
+
+      - name: Read mod id
+        id: meta
+        shell: bash
+        run: bash .mod-builder/scripts/read-mod-id.sh
+
+      - name: Validate
+        id: validate
+        shell: bash
+        run: bash .mod-builder/scripts/validate-mod-id.sh "${{ steps.meta.outputs.mod_id }}" "${{ steps.semver.outputs.resolved }}" "${{ steps.semver.outputs.tag }}"

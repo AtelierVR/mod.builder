@@ -24,7 +24,7 @@ check() {
   fi
 }
 
-echo "=== Checking mod structure: $MOD_DIR ==="
+echo "::group::Check mod structure: $MOD_DIR"
 
 # 1. package.json
 test -f "$MOD_DIR/package.json"
@@ -41,13 +41,22 @@ check $([ -n "$MANIFEST" ]; echo $?) "nox.mod.json[c]"
 
 if [ -z "$MANIFEST" ]; then
   echo ""
-  echo "$ERRORS error(s) — cannot continue without manifest"
+  echo "::error title=Check::$ERRORS error(s) — cannot continue without manifest"
   exit 1
 fi
 
 # 3. Root .asmdef (repo root or SDK/)
 ASMDEF_COUNT=$(find "$MOD_DIR" -maxdepth 2 -name "*.asmdef" | wc -l)
 check $([ "$ASMDEF_COUNT" -gt 0 ]; echo $?) ".asmdef ($ASMDEF_COUNT found)"
+
+echo ""
+if [ "$ERRORS" -eq 0 ]; then
+  echo "::notice title=Check::All checks passed"
+else
+  echo "::error title=Check::$ERRORS error(s) found"
+fi
+
+echo "::endgroup::"
 
 # 4. Entrypoints reference existing asmdef names
 ALL_ASMDEFS=$(find "$MOD_DIR" -name "*.asmdef" -exec jq -r '.name' {} \; | sort -u)
