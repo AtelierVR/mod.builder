@@ -1,97 +1,96 @@
 # ────────────────────────────────────────────────────────────────
-# build-mod.ps1 — CI orchestration: pull, setup, build
-# All git & bash commands run through WSL for consistency.
-# Run from workspace root or builder/scripts/ — auto-detects.
+# build-mod.ps1 — Launch Unity build, tail logs, exit with Unity
+# Usage: build-mod.ps1 <projectPath> <modId> "Win=path,Linux=path"
+# Example: build-mod.ps1 "D:\proj" "nox.network" "StandaloneWindows64=D:\out\win,StandaloneLinux64=D:\out\linux"
 # ────────────────────────────────────────────────────────────────
+param(
+    [Parameter(Mandatory=$true)] [string] $ProjectPath,
+    [Parameter(Mandatory=$true)] [string] $ModId,
+    [Parameter(Mandatory=$true)] [string] $Platform,
+    [switch] $ShowStackTraces
+)
+
 $ErrorActionPreference = "Stop"
 
-# Resolve workspace root (parent of builder/)
-$workspaceRoot = if (Test-Path (Join-Path $PSScriptRoot "..\..\.env")) {
-    Join-Path $PSScriptRoot "..\.."
-} elseif (Test-Path (Join-Path $PSScriptRoot ".env")) {
-    $PSScriptRoot
-} else {
-    Write-Error "Cannot find workspace root (no .env found)"
-    exit 1
-}
-Set-Location $workspaceRoot
-
 # ── Helpers ────────────────────────────────────────────────────
-function ConvertTo-WslPath {
-    param([string]$winPath)
-    $p = (Resolve-Path $winPath).Path -replace '\\', '/'
-    if ($p -match '^([A-Za-z]):(.*)') {
-        return '/mnt/' + $Matches[1].ToLower() + $Matches[2]
+$StackTracePattern = '^\s*(at |Rethrow |--- End of |\(at |\[0x)'
+
+# ── 1. Paths ───────────────────────────────────────────────────
+$unityEditor = "C:\Program Files\Unity\Hub\Editor\6000.4.4f1\Editor\Unity.exe"
+$logFile = Join-Path $ProjectPath "Logs\ModBuilder_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+$logDir = Split-Path $logFile -Parent
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+
+# Remove previous output (log file is timestamped, no need to remove)
+# Build paths come from Platform parameter, no single OutputPath to clean
+
+# ── 2. Build arguments ─────────────────────────────────────────
+$unityArgs = @(
+    "-batchmode",
+    "-projectPath", $ProjectPath,
+    "-logFile", $logFile,
+    "-executeMethod", "Nox.GameBuilder.Pipeline.ExternalBuilder.BuildMod",
+    "--noxMod", $ModId,
+    "--noxOutput", $Platform,
+    "-accept-apiupdate"
+)
+
+$displayPlatforms = ($Platform -split ',' | ForEach-Object { $_.Trim() }) -join "`n               "
+
+Write-Host "=== Unity Build ==="
+Write-Host "Unity       : $unityEditor"
+Write-Host "Project     : $ProjectPath"
+Write-Host "Mod         : $ModId"
+Write-Host "Platform(s) : $displayPlatforms"
+Write-Host "Log file    : $logFile"
+Write-Host ""
+
+# ── 3. Start Unity process ─────────────────────────────────────
+Write-Host "Starting Unity..."
+$proc = Start-Process -FilePath $unityEditor -ArgumentList $unityArgs -PassThru -NoNewWindow
+
+# ── 4. Tail log file in background ─────────────────────────────
+$tailJob = Start-Job -ScriptBlock {
+    param($logPath, $filterTraces)
+    while (-not (Test-Path $logPath)) { Start-Sleep -Milliseconds 500 }
+    Get-Content $logPath -Wait -Tail 0 | ForEach-Object {
+        if ($filterTraces -and $_ -match '^\s*(at |Rethrow |--- End of |\(at |\[0x)') { return }
+        $_
     }
-    return $p
-}
+} -ArgumentList $logFile, (-not $ShowStackTraces)
 
-function Invoke-Wsl {
-    param([string]$command, [string]$description)
-    if ($description) { Write-Host "  $description" }
-    $wslCmd = "cd '$rootWsl' ; $command"
-    wsl -e bash -c $wslCmd
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "WSL command failed (exit=$LASTEXITCODE): $command"
-        exit $LASTEXITCODE
+# ── 5. Wait for Unity to finish ────────────────────────────────
+try {
+    while (-not $proc.HasExited) {
+        Receive-Job $tailJob | ForEach-Object { Write-Host $_ }
+        Start-Sleep -Milliseconds 500
     }
+} finally {
+    Receive-Job $tailJob | ForEach-Object { Write-Host $_ }
+    Stop-Job $tailJob -ErrorAction SilentlyContinue
+    Remove-Job $tailJob -ErrorAction SilentlyContinue
 }
 
-# ── Detect WSL ─────────────────────────────────────────────────
-if (-not (Get-Command "wsl" -ErrorAction SilentlyContinue)) {
-    Write-Error "WSL is required but not found."
-    exit 1
-}
-
-$rootWsl = ConvertTo-WslPath "."
-Write-Host "Workspace (WSL): $rootWsl"
-
-# ── 1. Load MOD_ID from .env ───────────────────────────────────
-if (-not (Test-Path ".env")) {
-    Write-Error ".env file not found at root"
-    exit 1
-}
-Get-Content ".env" | ForEach-Object {
-    if ($_ -match '^\s*MOD_ID\s*=\s*(.+)$') {
-        $MOD_ID = $Matches[1].Trim()
+# ── 6. Final log dump ──────────────────────────────────────────
+Write-Host ""
+Write-Host "=== Build finished (exit code: $($proc.ExitCode)) ==="
+if (Test-Path $logFile) {
+    Write-Host "--- Last 40 lines of $logFile ---"
+    $lines = Get-Content $logFile -Tail 40
+    if (-not $ShowStackTraces) {
+        $lines = $lines | Where-Object { $_ -notmatch $StackTracePattern }
     }
-}
-if (-not $MOD_ID) {
-    Write-Error "MOD_ID not found in .env"
-    exit 1
-}
-Write-Host "MOD_ID: $MOD_ID"
-
-# ── 2. Git pull mod/ via WSL ───────────────────────────────────
-Write-Host "`n=== git pull mod/ ==="
-Invoke-Wsl "cd mod ; git pull"
-
-# ── 3. Git pull builder/ via WSL ───────────────────────────────
-Write-Host "`n=== git pull builder/ ==="
-Invoke-Wsl "cd builder ; git pull"
-
-# ── 4. Remove unity/ if it exists ──────────────────────────────
-if (Test-Path "unity") {
-    Write-Host "`n=== Removing existing unity/ ==="
-    Remove-Item -Recurse -Force "unity"
+    $lines | ForEach-Object { Write-Host $_ }
 }
 
-# ── 5. Create unity/ and write .env inside it ──────────────────
-Write-Host "`n=== Creating unity/ with .env ==="
-New-Item -ItemType Directory -Force -Path "unity" | Out-Null
-"MOD_ID=$MOD_ID" | Out-File -FilePath "unity\.env" -Encoding utf8
+# ── 7. Show build output ───────────────────────────────────────
+Write-Host ""
+$platforms = $Platform -split ',' | ForEach-Object { $_.Split('=')[1].Trim() }
+foreach ($outDir in $platforms) {
+    Write-Host "=== Build output: $outDir ==="
+    Get-ChildItem $outDir -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length | Format-Table -AutoSize | Out-String | ForEach-Object { Write-Host $_ }
+    if (-not (Get-ChildItem $outDir -ErrorAction SilentlyContinue)) { Write-Host "(empty or not found)" }
+    Write-Host ""
+}
 
-# ── 6. Fix line-endings (CRLF→LF) for shell scripts ────────────
-Write-Host "`n=== Fixing shell script line endings (CRLF -> LF) ==="
-Invoke-Wsl "sed -i 's/\r$//' '$rootWsl/builder/scripts/'*.sh"
-
-# ── 7. Run setup-unity-project.sh via WSL ──────────────────────
-Write-Host "`n=== Running setup-unity-project.sh ==="
-$unityWsl = "$rootWsl/unity"
-$builderScriptWsl = "$rootWsl/builder/scripts/setup-unity-project.sh"
-$modWsl = "$rootWsl/mod"
-Invoke-Wsl "bash '$builderScriptWsl' '$MOD_ID' '$modWsl' '$unityWsl'"
-
-# ── 8. Run build.ps1 ───────────────────────────────────────────
-Write-Host "`n=== Running build.ps1 ==="
-& (Join-Path $PSScriptRoot "build.ps1")
+exit $proc.ExitCode
