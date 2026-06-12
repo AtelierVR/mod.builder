@@ -13,7 +13,7 @@ on:
       version:
         type: string
         default: ""
-      noLibraryCache:
+      no_library_cache:
         type: boolean
         default: false
         description: "Skip restoring the Library cache (use after dependency changes like adding DLLs)"
@@ -55,7 +55,7 @@ jobs:
         run: bash .mod-builder/scripts/set-version.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
       - uses: actions/cache@v4
-        if: ${{ !inputs.noLibraryCache }}
+        if: ${{ !inputs.no_library_cache }}
         with:
           path: project/Library
           key: Library-${{ inputs.mod_id }}-${{ hashFiles('project/Packages/**') }}
