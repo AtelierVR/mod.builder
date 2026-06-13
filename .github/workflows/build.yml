@@ -70,15 +70,11 @@ jobs:
         run: bash .mod-builder/scripts/init-git.sh
 
       - name: Pre-build
-        shell: bash
-        run: bash .mod-builder/scripts/pre-build.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
-
-      - name: Build Output args
         id: output
         env:
           PLATFORMS: ${{ inputs.platforms }}
         shell: bash
-        run: bash .mod-builder/scripts/build-nox-output.sh
+        run: bash .mod-builder/scripts/pre-build.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
       - uses: game-ci/unity-builder@v4
         env:
@@ -100,6 +96,8 @@ jobs:
 
       - name: Post-build
         if: always()
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
         shell: bash
         run: bash .mod-builder/scripts/post-build.sh "${{ inputs.mod_id }}"
 
