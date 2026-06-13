@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
-# Reusable — build any Nox mod (DLLs + AssetBundles)
+# Reusable — build any Nox mod for multiple platforms in parallel
 # ═══════════════════════════════════════════════════════════════
 
 name: Build Mod
@@ -13,10 +13,14 @@ on:
       version:
         type: string
         default: ""
+      platforms:
+        type: string
+        required: true
+        description: "Space-separated list: windows, linux, macos, android, ios"
       no_library_cache:
         type: boolean
         default: false
-        description: "Skip restoring the Library cache (use after dependency changes like adding DLLs)"
+        description: "Skip restoring the Library cache"
     secrets:
       UNITY_LICENSE:
         required: true
@@ -69,6 +73,13 @@ jobs:
         shell: bash
         run: bash .mod-builder/scripts/pre-build.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
+      - name: Build Output args
+        id: output
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: bash .mod-builder/scripts/build-nox-output.sh
+
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -83,8 +94,9 @@ jobs:
           manualExit: true
           customParameters: >-
             -accept-apiupdate
-            -noxModToBuild ${{ inputs.mod_id }}
-            -noxOutputPath build
+            --noxMod ${{ inputs.mod_id }}
+            --noxOutput ${{ steps.output.outputs.args }}
+            --githubAction
 
       - name: Post-build
         if: always()
@@ -102,21 +114,29 @@ jobs:
             ~/.config/unity3d/Editor.log
           if-no-files-found: ignore
 
-      - name: Package
-        id: package
+      - name: Package all platforms
         env:
           MOD_ID: ${{ inputs.mod_id }}
           MOD_VERSION: ${{ inputs.version }}
+          PLATFORMS: ${{ inputs.platforms }}
           GH_NAME: ${{ github.event.repository.name }}
           GH_DESC: ${{ github.event.repository.description }}
           GH_LICENSE: ${{ github.event.repository.license.spdx_id }}
         shell: bash
-        run: bash .mod-builder/scripts/package-mod.sh "$MOD_ID" "project/build/$MOD_ID" "$MOD_VERSION" "full"
+        run: bash .mod-builder/scripts/package-all-platforms.sh
 
       - uses: actions/upload-artifact@v4
         with:
-          name: package
-          path: ${{ inputs.mod_id }}-${{ inputs.version }}-full.zip
+          name: packages
+          path: ${{ inputs.mod_id }}-${{ inputs.version }}-*.zip
+
+      - name: Generate merged manifest
+        env:
+          MOD_ID: ${{ inputs.mod_id }}
+          MOD_VERSION: ${{ inputs.version }}
+          PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: bash .mod-builder/scripts/build-manifest.sh
 
       - uses: actions/upload-artifact@v4
         with:

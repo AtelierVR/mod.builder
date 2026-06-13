@@ -1,13 +1,14 @@
 # ────────────────────────────────────────────────────────────────
 # build-mod.ps1 — Launch Unity build, tail logs, exit with Unity
-# Usage: build-mod.ps1 <projectPath> <modId> "Win=path,Linux=path"
-# Example: build-mod.ps1 "D:\proj" "nox.network" "StandaloneWindows64=D:\out\win,StandaloneLinux64=D:\out\linux"
+# Usage: build-mod.ps1 <projectPath> <modId> "windows=path,linux=path"
+# Example: build-mod.ps1 "D:\proj" "nox.network" "windows=D:\out\win,linux=D:\out\linux"
 # ────────────────────────────────────────────────────────────────
 param(
     [Parameter(Mandatory=$true)] [string] $ProjectPath,
     [Parameter(Mandatory=$true)] [string] $ModId,
     [Parameter(Mandatory=$true)] [string] $Platform,
-    [switch] $ShowStackTraces
+    [switch] $ShowStackTraces,
+    [switch] $GitHubAction
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +36,8 @@ $unityArgs = @(
     "-accept-apiupdate"
 )
 
+if ($GitHubAction) { $unityArgs += "--githubAction" }
+
 $displayPlatforms = ($Platform -split ',' | ForEach-Object { $_.Trim() }) -join "`n               "
 
 Write-Host "=== Unity Build ==="
@@ -42,6 +45,7 @@ Write-Host "Unity       : $unityEditor"
 Write-Host "Project     : $ProjectPath"
 Write-Host "Mod         : $ModId"
 Write-Host "Platform(s) : $displayPlatforms"
+if ($GitHubAction) { Write-Host "GH Actions  : enabled" }
 Write-Host "Log file    : $logFile"
 Write-Host ""
 
