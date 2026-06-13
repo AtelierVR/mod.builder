@@ -117,24 +117,24 @@ jobs:
           MOD_ID: ${{ inputs.mod_id }}
           MOD_VERSION: ${{ inputs.version }}
           PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: bash .mod-builder/scripts/generate-packages.sh
+
+      - name: Generate manifest
+        env:
+          MOD_ID: ${{ inputs.mod_id }}
+          MOD_VERSION: ${{ inputs.version }}
+          PLATFORMS: ${{ inputs.platforms }}
           GH_NAME: ${{ github.event.repository.name }}
           GH_DESC: ${{ github.event.repository.description }}
           GH_LICENSE: ${{ github.event.repository.license.spdx_id }}
         shell: bash
-        run: bash .mod-builder/scripts/package-all-platforms.sh
+        run: bash .mod-builder/scripts/generate-manifest.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: packages
           path: ${{ inputs.mod_id }}-${{ inputs.version }}-*.zip
-
-      - name: Generate merged manifest
-        env:
-          MOD_ID: ${{ inputs.mod_id }}
-          MOD_VERSION: ${{ inputs.version }}
-          PLATFORMS: ${{ inputs.platforms }}
-        shell: bash
-        run: bash .mod-builder/scripts/build-manifest.sh
 
       - uses: actions/upload-artifact@v4
         with:
