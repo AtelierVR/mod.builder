@@ -41,6 +41,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: mod
+          lfs: true
 
       - uses: actions/checkout@v4
         with:
