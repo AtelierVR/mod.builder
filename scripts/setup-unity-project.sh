@@ -169,7 +169,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
     # Get URL for this dep (from mod manifest, builder registers, or manifest.json)
     URL=$(jq -r --arg d "$dep" '[.relations[]? | select(.id == $d) | .register // empty][0] // empty' "$MANIFEST")
     [ -z "$URL" ] && URL=$(echo "$BUILDER_REGISTERS" | jq -r --arg d "$dep" '.[$d] // empty')
-    [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '[.dependencies[$dep] // empty][0]' "$PROJECT_DIR/Packages/manifest.json")
+    [ -z "$URL" ] && URL=$(jq -r --arg d "$dep" '[.dependencies[$d] // empty][0]' "$PROJECT_DIR/Packages/manifest.json")
     [ -z "$URL" ] && continue  # upm/nuget, can't recurse
 
     case "$URL" in
