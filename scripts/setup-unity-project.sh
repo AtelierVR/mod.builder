@@ -125,10 +125,15 @@ fetch_manifest() {
 
   local TMPDIR=$(mktemp -d)
   local attempt=0
-  while ! git clone --depth 1 "$repo" "$TMPDIR" 2>/dev/null; do
+  local clone_url="$repo"
+  # Authenticated clone avoids GitHub anonymous-clone throttling on runners
+  if [ -n "${GITHUB_TOKEN:-}" ] && [ "${clone_url#https://github.com/}" != "$clone_url" ]; then
+    clone_url="https://x-access-token:${GITHUB_TOKEN}@${clone_url#https://}"
+  fi
+  while ! git clone --depth 1 "$clone_url" "$TMPDIR" 2>/dev/null; do
     attempt=$((attempt+1))
-    [ "$attempt" -ge 3 ] && break
-    sleep 3
+    [ "$attempt" -ge 5 ] && break
+    sleep $((attempt * 2))
   done
   for mf in "$TMPDIR$subpath/nox.mod.json" "$TMPDIR$subpath/nox.mod.jsonc" "$TMPDIR$subpath/package.json" "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
     if [ -f "$mf" ]; then
