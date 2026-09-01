@@ -50,6 +50,20 @@ for plat in $PLATFORMS; do
 done
 FILES="$FILES]"
 
+# ── Fetch GitHub contributors (actual committers) ─────────────
+GH_CONTRIBUTORS="[]"
+if [ "$REPO" != "unknown/unknown" ]; then
+  GH_CONTRIBUTORS="$(curl -sL --max-time 15 "https://api.github.com/repos/$REPO/contributors?per_page=100" 2>/dev/null \
+    | jq -c '[.[]? | select(.login != null) | select(.login | test("\\[bot\\]$") | not) | {name: .login, url: ("https://github.com/" + .login), github: .login}] // []' 2>/dev/null)"
+  [ -z "$GH_CONTRIBUTORS" ] && GH_CONTRIBUTORS="[]"
+fi
+
+# Contributors = declared contributors + actual GitHub committers (deduped),
+# minus the author (REPO_OWNER). Authors are NOT merged into contributors.
+CONTRIBUTORS_JSON="$(jq '[.contributors[]? | {name, url: .website, github: (.website // "" | capture("github\\.com/(?<u>[^/]+)") | .u // "")}] + $gh | unique_by(.github) | map(select(.github != $author))' "$MF" \
+  --argjson gh "$GH_CONTRIBUTORS" \
+  --arg author "$REPO_OWNER")"
+
 # ── Generate manifest.json ────────────────────────────────────
 jq -n \
   --arg id "$MOD_ID" \
@@ -63,9 +77,7 @@ jq -n \
   --arg repo_owner "$REPO_OWNER" \
   --arg mod_source "$MOD_SOURCE" \
   --argjson dependencies "$(jq '[.relations[]? | select(.type == "depends") | {(.id): .register}] | add // {}' "$MF")" \
-  --argjson contributors "$(jq -s '.[0] + .[1]' \
-    <(jq '[.authors[]? | {name, url: .website // "", github: (.website // "" | capture("github\\.com/(?<u>[^/]+)") | .u // "")}]' "$MF") \
-    <(jq '[.contributors[]? | {name, url: .website, github: (.website // "" | capture("github\\.com/(?<u>[^/]+)") | .u // "")}] | if length > 0 then . else [] end' "$MF"))" \
+  --argjson contributors "$CONTRIBUTORS_JSON" \
   --argjson files "$FILES" \
   --arg generated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{
