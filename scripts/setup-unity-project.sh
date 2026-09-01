@@ -130,7 +130,8 @@ fetch_manifest() {
   if [ -n "${GITHUB_TOKEN:-}" ] && [ "${clone_url#https://github.com/}" != "$clone_url" ]; then
     clone_url="https://x-access-token:${GITHUB_TOKEN}@${clone_url#https://}"
   fi
-  while ! git clone --depth 1 "$clone_url" "$TMPDIR" 2>/dev/null; do
+  # GIT_LFS_SKIP_SMUDGE: runners may lack git-lfs; we only need nox.mod.json (not LFS)
+  while ! GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 "$clone_url" "$TMPDIR" 2>/dev/null; do
     attempt=$((attempt+1))
     [ "$attempt" -ge 5 ] && break
     sleep $((attempt * 2))
