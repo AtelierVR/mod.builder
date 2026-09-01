@@ -124,21 +124,25 @@ fetch_manifest() {
   repo="${repo%%.git}"
 
   local TMPDIR=$(mktemp -d)
-  if git clone --depth 1 "$repo" "$TMPDIR" 2>/dev/null; then
-    for mf in "$TMPDIR$subpath/nox.mod.json" "$TMPDIR$subpath/nox.mod.jsonc" "$TMPDIR$subpath/package.json" "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
-      if [ -f "$mf" ]; then
-        id=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
-        if [ -n "$id" ] && [ "$id" != "null" ]; then
-          provides=$(jq -r '[.provides[]?] | join(" ")' "$mf" 2>/dev/null)
-          relations=$(jq -c '[.relations[]? | {id,type,register}]' "$mf" 2>/dev/null)
-          echo "$id|$provides|$relations"
-          rm -rf "$TMPDIR"
-          return 0
-        fi
+  local attempt=0
+  while ! git clone --depth 1 "$repo" "$TMPDIR" 2>/dev/null; do
+    attempt=$((attempt+1))
+    [ "$attempt" -ge 3 ] && break
+    sleep 3
+  done
+  for mf in "$TMPDIR$subpath/nox.mod.json" "$TMPDIR$subpath/nox.mod.jsonc" "$TMPDIR$subpath/package.json" "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
+    if [ -f "$mf" ]; then
+      id=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
+      if [ -n "$id" ] && [ "$id" != "null" ]; then
+        provides=$(jq -r '[.provides[]?] | join(" ")' "$mf" 2>/dev/null)
+        relations=$(jq -c '[.relations[]? | {id,type,register}]' "$mf" 2>/dev/null)
+        echo "$id|$provides|$relations"
+        rm -rf "$TMPDIR"
+        return 0
       fi
-    done
-    rm -rf "$TMPDIR"
-  fi
+    fi
+  done
+  rm -rf "$TMPDIR"
 
   return 1
 }
@@ -159,7 +163,7 @@ while [ -n "$RESOLVED_DEPS" ]; do
 
     case "$URL" in
       git+*|http*)
-        MANIFEST_DATA=$(fetch_manifest "$URL")
+        MANIFEST_DATA=$(fetch_manifest "$URL") || true
         if [ -z "$MANIFEST_DATA" ]; then
           echo "::error::Failed to fetch manifest for '$dep' from $URL"
           exit 1
@@ -213,7 +217,7 @@ for key in $(jq -r '.dependencies | keys[]' "$PROJECT_DIR/Packages/manifest.json
   URL=$(jq -r --arg k "$key" '.dependencies[$k]' "$PROJECT_DIR/Packages/manifest.json")
   case "$URL" in
     http*)
-      MANIFEST_DATA=$(fetch_manifest "$URL")
+      MANIFEST_DATA=$(fetch_manifest "$URL") || true
       if [ -n "$MANIFEST_DATA" ]; then
         REAL_ID=$(echo "$MANIFEST_DATA" | cut -d'|' -f1)
         if [ -n "$REAL_ID" ] && [ "$REAL_ID" != "null" ] && [ "$REAL_ID" != "$key" ]; then
