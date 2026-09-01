@@ -125,17 +125,22 @@ fetch_manifest() {
 
   local TMPDIR=$(mktemp -d)
   local attempt=0
+  local git_err=""
   local clone_url="$repo"
   # Authenticated clone avoids GitHub anonymous-clone throttling on runners
   if [ -n "${GITHUB_TOKEN:-}" ] && [ "${clone_url#https://github.com/}" != "$clone_url" ]; then
     clone_url="https://x-access-token:${GITHUB_TOKEN}@${clone_url#https://}"
   fi
   # GIT_LFS_SKIP_SMUDGE: runners may lack git-lfs; we only need nox.mod.json (not LFS)
-  while ! GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 "$clone_url" "$TMPDIR" 2>/dev/null; do
+  while :; do
+    git_err=$(GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 "$clone_url" "$TMPDIR" 2>&1) && break
     attempt=$((attempt+1))
     [ "$attempt" -ge 5 ] && break
     sleep $((attempt * 2))
   done
+  if [ "$attempt" -ge 5 ] && [ ! -d "$TMPDIR/.git" ]; then
+    echo "::warning::git clone failed for $clone_url: $(echo "$git_err" | tr '\n' ' ' | cut -c1-500)" >&2
+  fi
   for mf in "$TMPDIR$subpath/nox.mod.json" "$TMPDIR$subpath/nox.mod.jsonc" "$TMPDIR$subpath/package.json" "$TMPDIR/nox.mod.json" "$TMPDIR/nox.mod.jsonc" "$TMPDIR/package.json"; do
     if [ -f "$mf" ]; then
       id=$(jq -r '.id // .name // empty' "$mf" 2>/dev/null)
