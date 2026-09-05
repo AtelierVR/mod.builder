@@ -8,20 +8,7 @@ on:
   workflow_call: {}
 
 jobs:
-  env-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: AtelierVR/mod.builder
-          path: .mod-builder
-
-      - name: Validate Unity environment secrets
-        shell: bash
-        run: bash .mod-builder/scripts/check-unity-env.sh
-
   check:
-    needs: env-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

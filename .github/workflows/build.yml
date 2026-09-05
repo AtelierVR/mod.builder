@@ -77,6 +77,14 @@ jobs:
         shell: bash
         run: bash .mod-builder/scripts/pre-build.sh "${{ inputs.mod_id }}" "${{ inputs.version }}"
 
+      - name: Validate Unity environment
+        shell: bash
+        run: bash .mod-builder/scripts/check-unity-env.sh
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
       - uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
