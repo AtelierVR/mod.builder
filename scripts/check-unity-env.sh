@@ -33,15 +33,15 @@ if [ -z "${UNITY_LICENSE:-}" ]; then
   echo "  [FAIL] UNITY_LICENSE is not set" >&2
   ERRORS=$((ERRORS + 1))
 else
-  # Check for .ulf structure
-  echo "$UNITY_LICENSE" | grep -q '<License id='
-  check $? '<License id=' element present'
+  # Check for .ulf structure (use double quotes — secret may contain single quotes)
+  echo "$UNITY_LICENSE" | grep -q "<License id="
+  check $? "<License id= element present"
 
-  echo "$UNITY_LICENSE" | grep -q '<SerialHash'
-  check $? '<SerialHash' element present'
+  echo "$UNITY_LICENSE" | grep -q "<SerialHash"
+  check $? "<SerialHash element present"
 
-  echo "$UNITY_LICENSE" | grep -q '<MachineBindings'
-  check $? '<MachineBindings' element present'
+  echo "$UNITY_LICENSE" | grep -q "<MachineBindings"
+  check $? "<MachineBindings element present"
 
   # Validate as XML
   if command -v xmllint &>/dev/null; then
@@ -56,7 +56,7 @@ else
   fi
 
   # Reject if it looks like a file path
-  if echo "$UNITY_LICENSE" | grep -qE '^/[A-Za-z]:|^\.ulf$|\.ulf$|Unity_lic'; then
+  if echo "$UNITY_LICENSE" | grep -qE "^/[A-Za-z]:|\.ulf\$|Unity_lic"; then
     echo "  [FAIL] UNITY_LICENSE looks like a file PATH, not file content" >&2
     echo "         The secret must contain the .ulf XML content, not 'C:\\...'" >&2
     ERRORS=$((ERRORS + 1))
