@@ -49,6 +49,14 @@ else
     check_fail "<MachineBindings element missing"
   fi
 
+  # Compute a fingerprint hash of the three secrets for debugging
+  LIC_HASH=$(echo "$UNITY_LICENSE" | sha256sum | cut -d' ' -f1 | cut -c1-16)
+  EMAIL_HASH=$(echo "$UNITY_EMAIL" | sha256sum | cut -d' ' -f1 | cut -c1-16)
+  PASS_HASH=$(echo "$UNITY_PASSWORD" | sha256sum | cut -d' ' -f1 | cut -c1-16)
+  echo "  [INFO]  UNITY_LICENSE sha256/16: $LIC_HASH"
+  echo "  [INFO]  UNITY_EMAIL sha256/16:    $EMAIL_HASH"
+  echo "  [INFO]  UNITY_PASSWORD sha256/16:   $PASS_HASH"
+
   # Validate as XML if xmllint is available
   if command -v xmllint &>/dev/null; then
     if echo "$UNITY_LICENSE" | xmllint --noout - 2>/dev/null; then
@@ -63,6 +71,32 @@ else
   # Reject if it looks like a file path
   if echo "$UNITY_LICENSE" | grep -qE "^/[A-Za-z]:|\.ulf\$|Unity_lic"; then
     check_fail "looks like a file PATH, not file content"
+  fi
+
+  # Validate email/password against Unity license API
+  if [ -n "${UNITY_EMAIL:-}" ] && [ -n "${UNITY_PASSWORD:-}" ]; then
+    echo ""
+    echo "Validating UNITY_EMAIL + UNITY_PASSWORD against Unity license API..."
+    HTTP_CODE=$(curl -sL -X POST "https://license.unity3d.com/request" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "username=${UNITY_EMAIL}&password=${UNITY_PASSWORD}&license_request=1" \
+      --max-time 30 \
+      -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+
+    case "$HTTP_CODE" in
+      200)
+        check_ok "Unity credentials are valid"
+        ;;
+      401|403)
+        check_fail "Unity credentials rejected (HTTP $HTTP_CODE)"
+        ;;
+      000)
+        echo "  [WARN] Could not reach Unity license API (network timeout) — build will retry activation" >&2
+        ;;
+      *)
+        echo "  [WARN] Unity license API returned HTTP $HTTP_CODE — activation will retry during build" >&2
+        ;;
+    esac
   fi
 fi
 
@@ -86,32 +120,6 @@ if [ -z "${UNITY_PASSWORD:-}" ]; then
   check_fail "UNITY_PASSWORD is not set"
 else
   check_ok "set"
-fi
-
-# ── 4. Validate email/password against Unity license API ─────────
-if [ -n "${UNITY_EMAIL:-}" ] && [ -n "${UNITY_PASSWORD:-}" ]; then
-  echo ""
-  echo "Validating UNITY_EMAIL + UNITY_PASSWORD against Unity license API..."
-  HTTP_CODE=$(curl -sL -X POST "https://license.unity3d.com/request" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "username=${UNITY_EMAIL}&password=${UNITY_PASSWORD}&license_request=1" \
-    --max-time 30 \
-    -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
-
-  case "$HTTP_CODE" in
-    200)
-      check_ok "Unity credentials are valid"
-      ;;
-    401|403)
-      check_fail "Unity credentials rejected (HTTP $HTTP_CODE)"
-      ;;
-    000)
-      echo "  [WARN] Could not reach Unity license API (network timeout) — build will retry activation" >&2
-      ;;
-    *)
-      echo "  [WARN] Unity license API returned HTTP $HTTP_CODE — activation will retry during build" >&2
-      ;;
-  esac
 fi
 
 echo "::endgroup::"
