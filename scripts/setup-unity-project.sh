@@ -21,6 +21,24 @@ echo "Source : $MOD_DIR"
 echo "Project: $PROJECT_DIR"
 echo "Unity  : $UNITY_VER"
 
+# ── GitHub token (for private dependency repositories) ────────
+# GH_PAT: a fine-grained PAT / GitHub App token able to read the organisation's
+# private asset repositories (AutoHand, FinalIK, …). Falls back to the automatic
+# GITHUB_TOKEN, which only covers the current repository.
+MOD_GIT_TOKEN="${GH_PAT:-${GITHUB_TOKEN:-}}"
+if [ -n "$MOD_GIT_TOKEN" ]; then
+  echo "::add-mask::$MOD_GIT_TOKEN"
+  # Authenticate host-side clones (manifest resolution).
+  git config --global url."https://x-access-token:${MOD_GIT_TOKEN}@github.com/".insteadOf "https://github.com/" || true
+  # Expose the same rewrite to the containerised Unity build via a
+  # workspace-local git config (referenced by GIT_CONFIG_GLOBAL in build.yml).
+  cat > "$(pwd)/.mod-gitconfig" <<EOF
+[url "https://x-access-token:${MOD_GIT_TOKEN}@github.com/"]
+	insteadOf = https://github.com/
+EOF
+  chmod 600 "$(pwd)/.mod-gitconfig" 2>/dev/null || true
+fi
+
 # ── 0. Pick the mod manifest (nox.mod.json or nox.mod.jsonc) ──
 MANIFEST="$MOD_DIR/nox.mod.json"
 [ -f "$MANIFEST" ] || MANIFEST="$MOD_DIR/nox.mod.jsonc"
@@ -128,8 +146,9 @@ fetch_manifest() {
   local git_err=""
   local clone_url="$repo"
   # Authenticated clone avoids GitHub anonymous-clone throttling on runners
-  if [ -n "${GITHUB_TOKEN:-}" ] && [ "${clone_url#https://github.com/}" != "$clone_url" ]; then
-    clone_url="https://x-access-token:${GITHUB_TOKEN}@${clone_url#https://}"
+  # and is required for private dependency repositories.
+  if [ -n "${MOD_GIT_TOKEN:-}" ] && [ "${clone_url#https://github.com/}" != "$clone_url" ]; then
+    clone_url="https://x-access-token:${MOD_GIT_TOKEN}@${clone_url#https://}"
   fi
   # GIT_LFS_SKIP_SMUDGE: runners may lack git-lfs; we only need nox.mod.json (not LFS)
   while :; do

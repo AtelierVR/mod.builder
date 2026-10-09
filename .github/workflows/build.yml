@@ -31,6 +31,9 @@ on:
       UNITY_PASSWORD:
         required: true
         description: "Unity account password"
+      GH_PAT:
+        required: false
+        description: "PAT / GitHub App token with read access to private dependency repos (optional; needed for private asset packages)"
 
 jobs:
   build:
@@ -52,6 +55,7 @@ jobs:
         env:
           MOD_ID: ${{ inputs.mod_id }}
           MOD_DIR: mod
+          GH_PAT: ${{ secrets.GH_PAT }}
         shell: bash
         run: bash .mod-builder/scripts/setup-unity-project.sh
 
@@ -90,6 +94,10 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          # Private UPM git deps: Unity runs inside the game-ci container, so point
+          # git at the credentialed config written by setup-unity-project.sh
+          # (workspace is mounted at /github/workspace inside the container).
+          GIT_CONFIG_GLOBAL: /github/workspace/.mod-gitconfig
         with:
           projectPath: project
           unityVersion: 6000.4.4f1
