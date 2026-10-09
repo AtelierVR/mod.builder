@@ -39,6 +39,20 @@ EOF
   chmod 600 "$(pwd)/.mod-gitconfig" 2>/dev/null || true
 fi
 
+# Prefix a github.com URL with the token so the (containerised) Unity build can
+# clone private packages. No-op without a token or for non-github URLs. The
+# credentials are scrubbed from build metadata before artifacts are uploaded
+# (scripts/scrub-manifest.sh).
+auth_url() {
+  local url="$1"
+  [ -z "${MOD_GIT_TOKEN:-}" ] && { echo "$url"; return; }
+  case "$url" in
+    *x-access-token:*) echo "$url" ;;
+    https://github.com/*) echo "https://x-access-token:${MOD_GIT_TOKEN}@${url#https://}" ;;
+    *) echo "$url" ;;
+  esac
+}
+
 # ── 0. Pick the mod manifest (nox.mod.json or nox.mod.jsonc) ──
 MANIFEST="$MOD_DIR/nox.mod.json"
 [ -f "$MANIFEST" ] || MANIFEST="$MOD_DIR/nox.mod.jsonc"
@@ -77,8 +91,8 @@ for dep in $DEPS; do
     upm:*)   URL="${URL#upm:}" ;;
     nuget:*) URL="${URL#nuget:}" ;;
   esac
-  MANIFEST_URL="$URL"
-  echo "  $dep → $MANIFEST_URL"
+  MANIFEST_URL="$(auth_url "$URL")"
+  echo "  $dep → $URL"
   jq --arg d "$dep" --arg u "$MANIFEST_URL" '.dependencies[$d] = $u' \
     "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
 done
@@ -227,8 +241,8 @@ while [ -n "$RESOLVED_DEPS" ]; do
               upm:*)   sdr="${sdr#upm:}" ;;
               nuget:*) sdr="${sdr#nuget:}" ;;
             esac
-            MURL="$sdr"
-            echo "    $sd → $MURL"
+            MURL="$(auth_url "$sdr")"
+            echo "    $sd → $sdr"
             jq --arg d "$sd" --arg u "$MURL" '.dependencies[$d] = $u' \
               "$PROJECT_DIR/Packages/manifest.json" > tmp.json && mv tmp.json "$PROJECT_DIR/Packages/manifest.json"
             NEW_DEPS="$NEW_DEPS $sd"

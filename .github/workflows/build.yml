@@ -118,6 +118,11 @@ jobs:
         shell: bash
         run: bash .mod-builder/scripts/post-build.sh "${{ inputs.mod_id }}"
 
+      - name: Scrub credentials from build metadata
+        if: always()
+        shell: bash
+        run: bash .mod-builder/scripts/scrub-manifest.sh
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
