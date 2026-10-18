@@ -19,6 +19,10 @@ on:
       prerelease:
         type: string
         default: "false"
+      notes:
+        type: string
+        default: ""
+        description: Markdown inserted between the changelog title and the commit lists
 
 jobs:
   release:
@@ -27,6 +31,14 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: the changelog walks the commits since the previous tag
+          fetch-tags: true
+
+      - uses: actions/checkout@v4
+        with:
+          repository: AtelierVR/mod.builder
+          path: .mod-builder
 
       - uses: actions/download-artifact@v4
         with:
@@ -38,13 +50,25 @@ jobs:
           name: manifest
           path: .
 
+      - name: Generate changelog
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV="$(git describe --tags --abbrev=0 --exclude "$TAG" HEAD 2>/dev/null || true)"
+          bash .mod-builder/scripts/generate-changelog.sh "$PREV" HEAD > CHANGELOG.md
+          cat CHANGELOG.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.mod_id }} ${{ inputs.tag }}
+          body_path: CHANGELOG.md
           prerelease: ${{ inputs.prerelease == 'true' }}
           make_latest: ${{ github.ref == 'refs/heads/main' }}
-          generate_release_notes: true
           files: |
             packages/*.zip
             manifest.json

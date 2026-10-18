@@ -36,6 +36,9 @@ on:
       version_override:
         description: "Override version (empty = auto)"
         required: false
+      release_notes:
+        description: "Markdown shown between the release title and the changelog (empty = none)"
+        required: false
 
 jobs:
   check:
@@ -64,6 +67,7 @@ jobs:
     with:
       tag: ${{ needs.version.outputs.tag }}
       prerelease: ${{ needs.version.outputs.prerelease }}
+      notes: ${{ inputs.release_notes }}
 ```
 
 ## Secrets
